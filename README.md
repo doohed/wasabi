@@ -3,6 +3,7 @@
 A terminal typing test. Written in Rust with
 [ratatui](https://ratatui.rs).
 
+<img width="1447" height="930" alt="image" src="https://github.com/user-attachments/assets/e22d2e87-eeac-491b-836b-34c0a1d52128" />
 
 
 I build this just to learn how to use [ratatui](https://ratatui.rs), nothing else.
@@ -50,7 +51,7 @@ number to show that early, so it shows `-- wpm`.
 
 Press `esc`, then pick a row.
 
-
+<img width="493" height="345" alt="image" src="https://github.com/user-attachments/assets/cd9fae4f-a904-4ad0-b81f-921b6a8f6bb8" />
 
 ### Test length
 
@@ -61,7 +62,7 @@ against a different clock would be meaningless.
 
 A personal best per test length, kept between sessions.
 
-
+<img width="536" height="302" alt="image" src="https://github.com/user-attachments/assets/5fa2fb35-ab6d-4068-a3ab-5c6d884f3db8" />
 
 The accuracy shown is *that run's*, not your best ever — a personal best is one
 result, and splitting it across runs would flatter you. Abandoned runs aren't
@@ -86,7 +87,7 @@ rather than allowed to shove the test off screen.
 
 ### Themes
 
-
+<img width="476" height="297" alt="image" src="https://github.com/user-attachments/assets/963ef956-1ad7-4228-b09e-eeeeac385e9d" />
 
 Moving the highlight applies the theme immediately, so the whole interface is
 the preview. There is nothing to confirm and nothing to cancel.
