@@ -5,7 +5,7 @@ use crate::storage;
 /// The art shipped with the app, used until the user supplies their own.
 const BUILT_IN: &str = include_str!("../assets/wasabi.txt");
 
-/// What a user's own art is called, inside [`storage::data_dir`].
+/// What a user's own art is called, inside [`storage::config_dir`].
 const FILE: &str = "banner.txt";
 
 /// The art drawn above the test.
@@ -134,7 +134,7 @@ impl Banner {
 }
 
 fn banner_path() -> Option<PathBuf> {
-    Some(storage::data_dir()?.join(FILE))
+    Some(storage::config_dir()?.join(FILE))
 }
 
 /// Strip `\r` and any trailing blank line, so a file saved on Windows or with

@@ -8,7 +8,7 @@ use crate::storage;
 /// can't be resolved.
 pub const DEFAULT: &str = "default";
 
-/// Where a user's own themes live, inside [`storage::data_dir`].
+/// Where a user's own themes live, inside [`storage::config_dir`].
 const FILE: &str = "themes.conf";
 
 /// Every colour the interface uses, named by its job rather than its hue.
@@ -322,7 +322,7 @@ impl Themes {
 }
 
 fn themes_path() -> Option<PathBuf> {
-    Some(storage::data_dir()?.join(FILE))
+    Some(storage::config_dir()?.join(FILE))
 }
 
 /// Parse `[name]` blocks of `field = colour` into themes.

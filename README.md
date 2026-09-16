@@ -146,15 +146,26 @@ the picker says how many were ignored, so a typo is never silent.
 
 ## Files
 
-State lives in `$XDG_DATA_HOME/wasabi`, falling back to
+Things you write live in `$XDG_CONFIG_HOME/wasabi`, falling back to
+`~/.config/wasabi`:
+
+| file | |
+|---|---|
+| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner on/off |
+| `banner.txt` | your ASCII art, absent until you make one |
+| `themes.conf` | your own palettes, absent until you press `e` in the picker |
+
+Things the app writes live in `$XDG_DATA_HOME/wasabi`, falling back to
 `~/.local/share/wasabi`:
 
 | file | |
 |---|---|
 | `records.tsv` | personal bests, one tab-separated line per test length |
-| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner on/off |
-| `banner.txt` | your ASCII art, absent until you make one |
-| `themes.conf` | your own palettes, absent until you press `e` in the picker |
+
+The split is the XDG convention, and it earns its keep: losing your personal
+bests is losing history, losing a setting is not, so the two deserve different
+backup habits. Versions before this kept everything in the data directory —
+those files are moved into place automatically on first run.
 
 All three are plain text and safe to edit or delete by hand. Reading them is
 infallible by design: a missing, unreadable or corrupt file means "no records
@@ -174,7 +185,7 @@ src/
 ├── settings.rs    preferences, and their file
 ├── banner.rs      the ASCII art, and its file
 ├── theme.rs       every colour the interface uses, and the theme file
-├── storage.rs     where files live
+├── storage.rs     where files live, and moving them when that changes
 └── ui/            rendering — reads from App, never writes to it
 ```
 
@@ -185,6 +196,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 127 tests, no terminal required
+cargo test     # 134 tests, no terminal required
 cargo clippy --all-targets
 ```

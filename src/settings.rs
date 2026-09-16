@@ -102,7 +102,7 @@ impl Settings {
 }
 
 fn settings_path() -> Option<PathBuf> {
-    Some(storage::data_dir()?.join(FILE))
+    Some(storage::config_dir()?.join(FILE))
 }
 
 fn format(values: &BTreeMap<String, String>) -> String {
