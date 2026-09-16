@@ -1,0 +1,141 @@
+# wasabi
+
+A terminal typing test. Written in Rust with
+[ratatui](https://ratatui.rs).
+
+
+
+I build this just to learn how to use [ratatui](https://ratatui.rs), nothing else.
+
+## Install
+
+```sh
+git clone https://github.com/doohed/wasabi.git
+cd wasabi
+cargo run --release
+```
+
+Requires a recent Rust toolchain. No other system dependencies.
+
+## Keys
+
+Every printable character is test input, so there are no bare letter shortcuts
+while typing — `q` types a `q`. That leaves Esc, Tab, and modifiers.
+
+| | |
+|---|---|
+| `space` | commit the current word |
+| `backspace` | delete a character, or step back a word |
+| `tab` | restart with a fresh word list |
+| `esc` | open the menu |
+| `ctrl-c` | quit |
+
+In the menu, `↑↓` (or `j`/`k`) moves, `enter` selects, `esc` goes back.
+
+## What it measures
+
+**WPM** is the standard definition: correctly typed characters divided by five,
+over elapsed minutes. Incorrect and overflow characters score nothing, so
+mistakes drag the number down.
+
+**Accuracy** is charged at keystroke time. Fixing a typo still costs you — the
+mistake happened, and a typing test that forgives it is measuring the wrong
+thing.
+
+Neither figure appears in the first second of a test. WPM divides by elapsed
+time, and one character extrapolates to a six-figure score; there is no honest
+number to show that early, so it shows `-- wpm`.
+
+## Settings
+
+Press `esc`, then pick a row.
+
+
+
+### Test length
+
+15, 30 or 60 seconds. Changing it always restarts — a half-typed test measured
+against a different clock would be meaningless.
+
+### Records
+
+A personal best per test length, kept between sessions.
+
+
+
+The accuracy shown is *that run's*, not your best ever — a personal best is one
+result, and splitting it across runs would flatter you. Abandoned runs aren't
+recorded.
+
+### Banner
+
+The ASCII art above the test is yours to replace.
+
+| key | |
+|---|---|
+| `e` | open it in `$EDITOR`, seeded with the current art |
+| `r` | reload it from disk |
+| `x` | remove it and go back to the built-in |
+
+Art is read from `banner.txt` (see [Files](#files)). Anything goes as long as
+it's text — the app measures whatever you save and lays out around it.
+
+Large art needs a large terminal. The banner screen tells you exactly how many
+rows yours needs and how many you have; if it doesn't fit, the art is hidden
+rather than allowed to shove the test off screen.
+
+### Themes
+
+
+
+Moving the highlight applies the theme immediately, so the whole interface is
+the preview. There is nothing to confirm and nothing to cancel.
+
+`default` is built from *named* terminal colours, so it inherits whatever
+palette your terminal already uses. The other four are fixed RGB: identical
+everywhere, which is the point of choosing one, but they ignore your terminal's
+own theme.
+
+## Files
+
+State lives in `$XDG_DATA_HOME/wasabi`, falling back to
+`~/.local/share/wasabi`:
+
+| file | |
+|---|---|
+| `records.tsv` | personal bests, one tab-separated line per test length |
+| `settings.tsv` | `key<TAB>value` preferences — currently just the theme |
+| `banner.txt` | your ASCII art, absent until you make one |
+
+All three are plain text and safe to edit or delete by hand. Reading them is
+infallible by design: a missing, unreadable or corrupt file means "no records
+yet" or "default settings", never a failure to start. Refusing to open a typing
+test because a scoreboard wouldn't parse would be the wrong trade.
+
+## How it's put together
+
+```
+src/
+├── main.rs        wiring
+├── tui.rs         terminal setup, event loop, key routing
+├── app/           all application state — no ratatui types anywhere
+├── word.rs        one word: its target, what was typed, per-character state
+├── wordlist.rs    the word pool
+├── records.rs     personal bests, and their file
+├── settings.rs    preferences, and their file
+├── banner.rs      the ASCII art, and its file
+├── theme.rs       every colour the interface uses
+├── storage.rs     where files live
+└── ui/            rendering — reads from App, never writes to it
+```
+
+The one rule worth knowing: **`app` holds no ratatui types and `ui` holds no
+state.** The UI reads from `App`, never the other way round, which is what
+makes the typing logic testable without a terminal. `theme.rs` names colours by
+their job — `accent`, `dim`, `error` — never by hue, which is what lets a whole
+palette swap underneath the renderers.
+
+```sh
+cargo test     # 95 tests, no terminal required
+cargo clippy --all-targets
+```
