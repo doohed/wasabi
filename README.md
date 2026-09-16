@@ -97,6 +97,41 @@ palette your terminal already uses. The other four are fixed RGB: identical
 everywhere, which is the point of choosing one, but they ignore your terminal's
 own theme.
 
+#### Your own themes
+
+| key | |
+|---|---|
+| `e` | open `themes.conf` in `$EDITOR`, seeded with a worked example |
+| `r` | reload it from disk |
+
+One `[name]` block per theme. Every field is optional — anything you leave out
+keeps the default theme's colour, so a two-line theme is perfectly valid:
+
+```ini
+[tokyonight]
+text    = #c8d3f5   # correctly typed characters, and the clock
+muted   = #a9b8e8   # menu rows
+dim     = #3b4261   # untyped characters, labels, panel borders
+error   = #ff757f   # a character that doesn't match
+extra   = #ff98a4   # characters typed past the end of a word
+accent  = #82aaff   # numbers, markers, panel titles
+good    = #c3e88d   # a personal best
+warn    = #ffc777   # warnings
+banner  = #82aaff   # the ASCII art above the test
+```
+
+Colours are `#rrggbb`, or a terminal colour name — `black red green yellow blue
+magenta cyan white gray darkgray lightred lightgreen lightyellow lightblue
+lightmagenta lightcyan`. Names come from your terminal's palette, so a theme
+built from them follows whatever colour scheme you already run; hex is exact
+everywhere and ignores it.
+
+Naming a block after a built-in **replaces** it, which is how you retune `nord`
+rather than inventing `nord2`. Your themes are marked with a `·` in the picker.
+
+A line that means nothing costs you that one colour, not the whole file — but
+the picker says how many were ignored, so a typo is never silent.
+
 ## Files
 
 State lives in `$XDG_DATA_HOME/wasabi`, falling back to
@@ -107,6 +142,7 @@ State lives in `$XDG_DATA_HOME/wasabi`, falling back to
 | `records.tsv` | personal bests, one tab-separated line per test length |
 | `settings.tsv` | `key<TAB>value` preferences — currently just the theme |
 | `banner.txt` | your ASCII art, absent until you make one |
+| `themes.conf` | your own palettes, absent until you press `e` in the picker |
 
 All three are plain text and safe to edit or delete by hand. Reading them is
 infallible by design: a missing, unreadable or corrupt file means "no records
@@ -125,7 +161,7 @@ src/
 ├── records.rs     personal bests, and their file
 ├── settings.rs    preferences, and their file
 ├── banner.rs      the ASCII art, and its file
-├── theme.rs       every colour the interface uses
+├── theme.rs       every colour the interface uses, and the theme file
 ├── storage.rs     where files live
 └── ui/            rendering — reads from App, never writes to it
 ```
@@ -137,6 +173,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 95 tests, no terminal required
+cargo test     # 117 tests, no terminal required
 cargo clippy --all-targets
 ```

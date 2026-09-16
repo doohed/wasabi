@@ -371,34 +371,38 @@ fn the_banner_screen_opens_from_the_menu_and_steps_back_to_it() {
 fn the_theme_starts_on_the_default() {
     let app = app(&["cat"]);
 
-    assert_eq!(app.theme().name, theme::DEFAULT);
+    assert_eq!(app.theme().name, crate::theme::DEFAULT);
     assert_eq!(app.theme_index(), 0);
 }
 
 #[test]
 fn the_banner_colour_comes_from_the_theme() {
     let mut app = app(&["cat"]);
-    assert_eq!(app.banner_colour(), theme::THEMES[0].banner);
+    let first = app.themes().all()[0].banner;
+    let second = app.themes().all()[1].banner;
 
+    assert_eq!(app.banner_colour(), first);
     app.theme_move(1);
-    assert_eq!(app.banner_colour(), theme::THEMES[1].banner);
+    assert_eq!(app.banner_colour(), second);
 }
 
 #[test]
 fn moving_through_the_picker_applies_the_theme() {
     let mut app = app(&["cat"]);
+    let second = app.themes().all()[1].name.clone();
     app.theme_move(1);
 
-    assert_eq!(app.theme().name, theme::THEMES[1].name);
+    assert_eq!(app.theme().name, second);
     assert_eq!(app.theme_index(), 1);
 }
 
 #[test]
 fn the_picker_wraps_at_both_ends() {
     let mut app = app(&["cat"]);
+    let last = app.themes().all().len() - 1;
 
     app.theme_move(-1);
-    assert_eq!(app.theme_index(), theme::THEMES.len() - 1);
+    assert_eq!(app.theme_index(), last);
 
     app.theme_move(1);
     assert_eq!(app.theme_index(), 0);
@@ -420,20 +424,23 @@ fn the_theme_picker_opens_from_the_menu_and_steps_back_to_it() {
 fn a_theme_survives_a_restart() {
     let mut app = app(&["cat"]);
     app.theme_move(1);
-    let chosen = app.theme().name;
+    let chosen = app.theme().name.clone();
     app.restart();
 
     assert_eq!(app.theme().name, chosen);
 }
 
 #[test]
-fn an_edit_request_is_taken_once() {
+fn an_edit_request_names_what_to_edit() {
     let mut app = app(&["cat"]);
-    assert!(!app.take_banner_edit());
+    assert_eq!(app.take_edit(), None);
 
-    app.request_banner_edit();
-    assert!(app.take_banner_edit());
-    assert!(!app.take_banner_edit());
+    app.request_edit(EditTarget::Themes);
+    assert_eq!(app.take_edit(), Some(EditTarget::Themes));
+    assert_eq!(app.take_edit(), None);
+
+    app.request_edit(EditTarget::Banner);
+    assert_eq!(app.take_edit(), Some(EditTarget::Banner));
 }
 
 #[test]

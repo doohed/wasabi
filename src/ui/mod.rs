@@ -85,7 +85,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         ),
         Screen::Theme => themes::render(
             frame,
-            centred(body_area, themes::WIDTH, themes::HEIGHT),
+            centred(body_area, themes::WIDTH, themes::height(app)),
             app,
         ),
         Screen::Records => records::render(

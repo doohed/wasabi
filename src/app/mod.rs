@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use crate::banner::Banner;
 use crate::records::Records;
 use crate::settings::Settings;
-use crate::theme::{self, Theme};
+use crate::theme::{Theme, Themes};
 use crate::word::{CharState, Word};
 use crate::wordlist;
 
@@ -30,6 +30,13 @@ pub enum Screen {
     Banner,
     Theme,
     Records,
+}
+
+/// A file the user can open in `$EDITOR` from inside the app.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditTarget {
+    Banner,
+    Themes,
 }
 
 /// A row of the menu.
@@ -100,11 +107,13 @@ pub struct App {
     /// A one-line message for the screen in front — the result of the last
     /// thing the user asked for. Cleared whenever they leave the screen.
     status: Option<String>,
-    /// Set when the user asks to edit their banner. The event loop picks this
-    /// up, because only it can hand the terminal over to `$EDITOR`.
-    edit_requested: bool,
-    /// Persisted preferences — currently just the banner colour.
+    /// Set when the user asks to edit one of their files. The event loop picks
+    /// this up, because only it can hand the terminal over to `$EDITOR`.
+    edit_requested: Option<EditTarget>,
+    /// Persisted preferences.
     settings: Settings,
+    /// The built-in palettes plus whatever the user's theme file defines.
+    themes: Themes,
 
     /// Set by the first keystroke, not by startup: the clock starts when the
     /// user does, so a test can sit on screen untouched.
@@ -126,7 +135,12 @@ pub struct App {
 impl App {
     /// The app as the user gets it: everything read from disk.
     pub fn new() -> Self {
-        Self::build(Records::load(), Banner::load(), Settings::load())
+        Self::build(
+            Records::load(),
+            Banner::load(),
+            Settings::load(),
+            Themes::load(),
+        )
     }
 
     /// The app with nothing behind it: every store in memory only.
@@ -136,11 +150,16 @@ impl App {
     /// acquire the power to write to the user's real files.
     #[cfg(test)]
     fn detached() -> Self {
-        Self::build(Records::default(), Banner::detached(), Settings::detached())
+        Self::build(
+            Records::default(),
+            Banner::detached(),
+            Settings::detached(),
+            Themes::detached(),
+        )
     }
 
     /// The single constructor both of those go through.
-    fn build(records: Records, banner: Banner, settings: Settings) -> Self {
+    fn build(records: Records, banner: Banner, settings: Settings, themes: Themes) -> Self {
         let mut app = Self {
             words: Vec::new(),
             cursor_word: 0,
@@ -152,8 +171,9 @@ impl App {
             new_best: false,
             banner,
             status: None,
-            edit_requested: false,
+            edit_requested: None,
             settings,
+            themes,
             started_at: None,
             ended_at: None,
             keystrokes: 0,
@@ -259,13 +279,18 @@ impl App {
     // -- theme ------------------------------------------------------------
 
     /// The palette everything is drawn in.
-    pub fn theme(&self) -> &'static Theme {
-        theme::resolve(self.settings.theme())
+    pub fn theme(&self) -> &Theme {
+        self.themes.get(self.settings.theme())
+    }
+
+    /// Every theme on offer, built-in and user-defined.
+    pub fn themes(&self) -> &Themes {
+        &self.themes
     }
 
     /// Row of the picker the current theme sits on.
     pub fn theme_index(&self) -> usize {
-        theme::index_of(self.settings.theme())
+        self.themes.index_of(self.settings.theme())
     }
 
     /// Move through the themes, applying each as it is highlighted.
@@ -274,10 +299,30 @@ impl App {
     /// the preview — which is the only honest way to judge a palette — and
     /// leaves nothing to cancel.
     pub fn theme_move(&mut self, delta: isize) {
-        let len = theme::THEMES.len() as isize;
+        let len = self.themes.all().len() as isize;
         let next = (self.theme_index() as isize + delta).rem_euclid(len) as usize;
+        let name = self.themes.all()[next].name.clone();
 
-        self.settings.set_theme(theme::THEMES[next].name);
+        self.settings.set_theme(&name);
+    }
+
+    /// Re-read the theme file, picking up anything just saved to it.
+    ///
+    /// The selected theme is left alone: if it vanished from the file, `theme()`
+    /// falls back on its own, and re-selecting for the user would lose their
+    /// choice the moment they made a typo.
+    pub fn reload_themes(&mut self) {
+        self.themes.reload();
+
+        let custom = self.themes.custom_count();
+        let skipped = self.themes.skipped_lines();
+
+        self.status = Some(match (custom, skipped) {
+            (0, 0) => "no themes in the file — showing the built-ins".to_string(),
+            (_, 0) => format!("loaded {custom} of your themes"),
+            (_, 1) => format!("loaded {custom} of your themes — 1 line ignored"),
+            (_, _) => format!("loaded {custom} of your themes — {skipped} lines ignored"),
+        });
     }
 
     // -- banner -----------------------------------------------------------
@@ -300,17 +345,17 @@ impl App {
         self.status = Some(message.into());
     }
 
-    /// Ask the event loop to open `$EDITOR` on the banner file.
+    /// Ask the event loop to open `$EDITOR` on one of the user's files.
     ///
     /// A request rather than an action: `App` has no business knowing there is
     /// a terminal to hand over, let alone how to give it back.
-    pub fn request_banner_edit(&mut self) {
-        self.edit_requested = true;
+    pub fn request_edit(&mut self, target: EditTarget) {
+        self.edit_requested = Some(target);
     }
 
     /// Consume the request, if there is one.
-    pub fn take_banner_edit(&mut self) -> bool {
-        std::mem::take(&mut self.edit_requested)
+    pub fn take_edit(&mut self) -> Option<EditTarget> {
+        self.edit_requested.take()
     }
 
     /// Re-read the banner file, picking up anything just saved to it.

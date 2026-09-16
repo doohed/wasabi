@@ -6,7 +6,7 @@ use color_eyre::Result;
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::DefaultTerminal;
 
-use crate::app::{App, Screen};
+use crate::app::{App, EditTarget, Screen};
 use crate::ui;
 
 /// How long to wait for a key before redrawing anyway.
@@ -37,8 +37,8 @@ fn event_loop(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
 
         // Handing the terminal to another program is the event loop's job:
         // nothing else in the app knows there is a terminal to hand over.
-        if app.take_banner_edit() {
-            terminal = edit_banner(terminal, app)?;
+        if let Some(target) = app.take_edit() {
+            terminal = edit_file(terminal, app, target)?;
         }
 
         // After the input, so a keystroke that lands on the last millisecond
@@ -105,7 +105,7 @@ fn menu_key(app: &mut App, key: KeyEvent) {
 fn banner_key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => app.back(),
-        KeyCode::Char('e') => app.request_banner_edit(),
+        KeyCode::Char('e') => app.request_edit(EditTarget::Banner),
         KeyCode::Char('r') => app.reload_banner(),
         KeyCode::Char('x') => app.reset_banner(),
         _ => {}
@@ -119,16 +119,22 @@ fn theme_key(app: &mut App, key: KeyEvent) {
         KeyCode::Esc | KeyCode::Enter => app.back(),
         KeyCode::Up | KeyCode::Char('k') => app.theme_move(-1),
         KeyCode::Down | KeyCode::Char('j') => app.theme_move(1),
+        KeyCode::Char('e') => app.request_edit(EditTarget::Themes),
+        KeyCode::Char('r') => app.reload_themes(),
         _ => {}
     }
 }
 
-/// Hand the terminal to `$EDITOR`, then take it back and reload the art.
+/// Hand the terminal to `$EDITOR`, then take it back and reload what changed.
 ///
 /// The terminal is moved in and a fresh one returned rather than restored in
 /// place: the old one is invalid the moment we leave the alternate screen, and
 /// making that a move means the type system says so.
-fn edit_banner(terminal: DefaultTerminal, app: &mut App) -> Result<DefaultTerminal> {
+fn edit_file(
+    terminal: DefaultTerminal,
+    app: &mut App,
+    target: EditTarget,
+) -> Result<DefaultTerminal> {
     // VISUAL before EDITOR: the former is conventionally the full-screen one,
     // which is what drawing pictures wants.
     let editor = std::env::var_os("VISUAL")
@@ -140,7 +146,12 @@ fn edit_banner(terminal: DefaultTerminal, app: &mut App) -> Result<DefaultTermin
         return Ok(terminal);
     };
 
-    let path = match app.banner().seed() {
+    let seeded = match target {
+        EditTarget::Banner => app.banner().seed(),
+        EditTarget::Themes => app.themes().seed(),
+    };
+
+    let path = match seeded {
         Ok(path) => path.to_path_buf(),
         Err(error) => {
             app.set_status(format!("couldn't create the file: {error}"));
@@ -148,7 +159,7 @@ fn edit_banner(terminal: DefaultTerminal, app: &mut App) -> Result<DefaultTermin
         }
     };
 
-    Ok(run_editor(terminal, app, &editor, &path))
+    Ok(run_editor(terminal, app, &editor, &path, target))
 }
 
 fn run_editor(
@@ -156,6 +167,7 @@ fn run_editor(
     app: &mut App,
     editor: &std::ffi::OsStr,
     path: &Path,
+    target: EditTarget,
 ) -> DefaultTerminal {
     drop(terminal);
     ratatui::restore();
@@ -168,10 +180,13 @@ fn run_editor(
     let _ = terminal.clear();
 
     match status {
-        Ok(status) if status.success() => app.reload_banner(),
+        Ok(status) if status.success() => match target {
+            EditTarget::Banner => app.reload_banner(),
+            EditTarget::Themes => app.reload_themes(),
+        },
         // A non-zero exit is usually a deliberate abort (`:cq`), so don't
         // reload — but say so, rather than looking like nothing happened.
-        Ok(_) => app.set_status("editor exited with an error — art unchanged"),
+        Ok(_) => app.set_status("editor exited with an error — nothing reloaded"),
         Err(error) => app.set_status(format!(
             "couldn't run {}: {error}",
             editor.to_string_lossy()
