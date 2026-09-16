@@ -43,19 +43,34 @@ fn offset(selected: usize, total: usize, visible: usize) -> usize {
     }
 }
 
-/// A strip of the colours that theme actually uses, so a name isn't the only
-/// thing to choose by.
-fn swatch(theme: &Theme) -> Vec<Span<'static>> {
+/// A miniature of the typing test, in that theme's colours.
+///
+/// Every state the test can put a character in appears exactly once: typed
+/// correctly, mistyped, overflowed past the end of a word, and not yet
+/// reached. A block of colour tells you a theme's hues; this tells you whether
+/// you could actually type in it.
+fn sample(theme: &Theme) -> Vec<Span<'static>> {
     [
-        theme.text,
-        theme.dim,
-        theme.error,
-        theme.accent,
-        theme.banner,
+        ("the quick ", theme.text),
+        // Mistyped. Shows the expected character, exactly as the test does.
+        ("b", theme.error),
+        ("rown", theme.text),
+        // Typed past the end of the word.
+        ("zz", theme.extra),
+        // Not reached yet.
+        (" fox", theme.dim),
     ]
     .into_iter()
-    .map(|colour| Span::styled("██", Style::default().fg(colour)))
+    .map(|(text, colour)| Span::styled(text, Style::default().fg(colour)))
     .collect()
+}
+
+/// The two colours the sample can't show: panel accents, and the art.
+fn swatch(theme: &Theme) -> Vec<Span<'static>> {
+    [theme.accent, theme.banner]
+        .into_iter()
+        .map(|colour| Span::styled("██", Style::default().fg(colour)))
+        .collect()
 }
 
 fn key(key: &str, what: &str, theme: &Theme) -> Line<'static> {
@@ -91,9 +106,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
             let mut spans = vec![
                 Span::raw(if highlighted { " › " } else { "   " }),
-                Span::styled(format!(" {:<10}", theme.name), label),
-                Span::raw("  "),
+                Span::styled(format!(" {:<11}", theme.name), label),
             ];
+            spans.extend(sample(theme));
+            spans.push(Span::raw("  "));
             spans.extend(swatch(theme));
             // Marks a theme as one of the user's own, so it's obvious which
             // rows come from their file.
