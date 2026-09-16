@@ -605,3 +605,84 @@ fn remaining_never_goes_negative() {
     app.started_at = Some(Instant::now() - app.duration() * 2);
     assert_eq!(app.remaining(), Duration::ZERO);
 }
+
+// -- the shape of a run -----------------------------------------------
+
+#[test]
+fn the_run_is_read_as_it_goes_on() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat ");
+
+    // Frames a comfortable distance apart. Consecutive seconds would have
+    // this racing a clock the test can't stop: every `started_at` is set
+    // against a fresh `now`, so two readings a nominal second apart can land
+    // a hair under one.
+    for second in [1, 3, 5] {
+        app.started_at = Some(Instant::now() - Duration::from_secs(second));
+        app.tick();
+    }
+
+    assert_eq!(app.timeline().samples().len(), 3);
+}
+
+#[test]
+fn frames_inside_the_same_second_dont_each_get_a_reading() {
+    let mut app = app(&["cat"]);
+    app.type_char('c');
+
+    for _ in 0..10 {
+        app.tick();
+    }
+
+    assert!(app.timeline().samples().is_empty());
+}
+
+#[test]
+fn the_second_the_clock_runs_out_in_still_gets_read() {
+    let mut app = app(&["cat"]);
+    app.type_char('c');
+    app.started_at = Some(Instant::now() - app.duration());
+    app.tick();
+
+    assert!(app.is_over());
+    assert!(
+        !app.timeline().samples().is_empty(),
+        "the reading has to be taken before the test is ended, or it's lost"
+    );
+}
+
+#[test]
+fn a_restart_forgets_the_shape_of_the_last_run() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat ");
+    app.started_at = Some(Instant::now() - Duration::from_secs(2));
+    app.tick();
+    assert!(!app.timeline().samples().is_empty());
+
+    app.restart();
+    assert!(app.timeline().samples().is_empty());
+}
+
+#[test]
+fn raw_wpm_counts_the_keystrokes_that_wpm_throws_away() {
+    let mut app = app(&["cat"]);
+    type_str(&mut app, "cxt");
+
+    // A round minute, so the arithmetic is checkable: 2 correct characters
+    // of 3 typed, over one minute.
+    let now = Instant::now();
+    app.started_at = Some(now - Duration::from_secs(60));
+    app.ended_at = Some(now);
+
+    let wpm = app.wpm().expect("a minute is plenty of elapsed time");
+    let raw = app.raw_wpm().expect("likewise");
+
+    assert!((wpm - 0.4).abs() < 1e-9, "got {wpm}");
+    assert!((raw - 0.6).abs() < 1e-9, "got {raw}");
+}
+
+#[test]
+fn there_is_no_raw_wpm_before_the_clock_starts() {
+    let app = app(&["cat"]);
+    assert_eq!(app.raw_wpm(), None);
+}

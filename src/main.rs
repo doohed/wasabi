@@ -4,6 +4,7 @@ mod records;
 mod settings;
 mod storage;
 mod theme;
+mod timeline;
 mod tui;
 mod ui;
 mod word;

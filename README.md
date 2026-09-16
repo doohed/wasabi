@@ -47,13 +47,43 @@ In the menu, `↑↓` (or `j`/`k`) moves, `enter` selects, `esc` goes back.
 over elapsed minutes. Incorrect and overflow characters score nothing, so
 mistakes drag the number down.
 
+**Raw WPM** is the same sum counting every keystroke, right or wrong. It's the
+speed of your fingers where WPM is the speed of your typing, and the gap
+between the two is what the mistakes cost you.
+
 **Accuracy** is charged at keystroke time. Fixing a typo still costs you — the
 mistake happened, and a typing test that forgives it is measuring the wrong
 thing.
 
-Neither figure appears in the first second of a test. WPM divides by elapsed
+**Consistency** is how even your pace was, as a percentage: the spread of your
+per-second speeds relative to their average, turned the right way up, so 100%
+is a metronome. Measured against your own average, a steady 40 wpm scores as
+well as a steady 100 — it's a question about evenness, not speed.
+
+**Peak** is your fastest single second.
+
+None of the speeds appear in the first second of a test. They divide by elapsed
 time, and one character extrapolates to a six-figure score; there is no honest
 number to show that early, so it shows `-- wpm`.
+
+## Results
+
+When the clock stops, the test is replaced by the run's own history: a reading
+a second, plotted.
+
+The accented line is your score as it stood at each moment — the number the
+clock was showing. The quiet line is each second on its own, which is jagged
+where the score is smooth, because it isn't averaged over everything that came
+before. Where the two diverge you can see the run's history weighing on it: a
+bad patch keeps costing you long after you've typed past it. Red dots mark the
+seconds you made a mistake in, on the line that shows those seconds.
+
+Both lines are in wpm on one scale, so the distance between them means
+something. Under the graph are the six figures above.
+
+The graph is the first thing dropped when the terminal is small, for the same
+reason the art is: the numbers are the result, and the picture is a nicer way
+of looking at them. Below 64 columns or 20 rows you get the figures alone.
 
 ## Settings
 
@@ -183,6 +213,7 @@ src/
 ├── word.rs        one word: its target, what was typed, per-character state
 ├── wordlist.rs    the word pool
 ├── records.rs     personal bests, and their file
+├── timeline.rs    a reading a second, and the figures derived from them
 ├── settings.rs    preferences, and their file
 ├── banner.rs      the ASCII art, and its file
 ├── theme.rs       every colour the interface uses, and the theme file
@@ -197,6 +228,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 134 tests, no terminal required
+cargo test     # 158 tests, no terminal required
 cargo clippy --all-targets
 ```

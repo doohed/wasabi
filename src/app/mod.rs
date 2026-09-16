@@ -4,6 +4,7 @@ use crate::banner::Banner;
 use crate::records::Records;
 use crate::settings::Settings;
 use crate::theme::{Theme, Themes};
+use crate::timeline::{self, Timeline};
 use crate::word::{CharState, Word};
 use crate::wordlist;
 
@@ -68,10 +69,6 @@ pub const MENU: [MenuItem; DURATIONS.len() + 3] = [
 /// the layout. MonkeyType has the same limit for the same reason.
 const MAX_OVERFLOW: usize = 10;
 
-/// The divisor in the standard WPM definition: a "word" is five characters,
-/// regardless of where the spaces fall.
-const CHARS_PER_WORD: f64 = 5.0;
-
 /// How much typing has to have happened before WPM means anything.
 ///
 /// WPM divides by elapsed time, so the first keystroke of a test extrapolates
@@ -130,6 +127,9 @@ pub struct App {
     /// Counted at keystroke time rather than derived from the final text,
     /// because fixing a typo should still cost you accuracy.
     mistakes: usize,
+    /// A reading a second, so the results can show the shape of the run and
+    /// not just its total.
+    timeline: Timeline,
 }
 
 impl App {
@@ -185,6 +185,7 @@ impl App {
             ended_at: None,
             keystrokes: 0,
             mistakes: 0,
+            timeline: Timeline::default(),
         };
 
         app.menu_index = app.duration_index();
@@ -203,6 +204,7 @@ impl App {
         self.ended_at = None;
         self.keystrokes = 0;
         self.mistakes = 0;
+        self.timeline.clear();
         self.new_best = false;
     }
 
@@ -446,9 +448,28 @@ impl App {
     /// The event loop is the only caller; keeping the expiry check here rather
     /// than inside `elapsed()` means a single place decides when time is up.
     pub fn tick(&mut self) {
-        if self.is_running() && self.elapsed() >= self.duration {
+        if !self.is_running() {
+            return;
+        }
+
+        // Read the run before ending it, so the last second of a test is on
+        // the graph rather than lost to the clock running out.
+        self.sample();
+
+        if self.elapsed() >= self.duration {
             self.end();
         }
+    }
+
+    /// Offer the timeline the run's totals; it decides whether a reading is
+    /// due. The locals are for the borrow checker, which can't see that
+    /// reading `self` and writing `self.timeline` don't overlap.
+    fn sample(&mut self) {
+        let at = self.elapsed().as_secs_f64();
+        let (correct, keystrokes, mistakes) =
+            (self.correct_chars(), self.keystrokes, self.mistakes);
+
+        self.timeline.tick(at, correct, keystrokes, mistakes);
     }
 
     /// Stop the clock and file the result.
@@ -595,8 +616,25 @@ impl App {
             return None;
         }
 
-        let minutes = elapsed.as_secs_f64() / 60.0;
-        Some((self.correct_chars() as f64 / CHARS_PER_WORD) / minutes)
+        Some(timeline::wpm(self.correct_chars(), elapsed.as_secs_f64()))
+    }
+
+    /// Words per minute counting every keystroke, right or wrong.
+    ///
+    /// The speed of the fingers where [`App::wpm`] is the speed of the typing:
+    /// the gap between the two is what the mistakes cost.
+    pub fn raw_wpm(&self) -> Option<f64> {
+        let elapsed = self.elapsed();
+        if elapsed < MIN_ELAPSED {
+            return None;
+        }
+
+        Some(timeline::wpm(self.keystrokes, elapsed.as_secs_f64()))
+    }
+
+    /// The run second by second, for the graph on the results screen.
+    pub fn timeline(&self) -> &Timeline {
+        &self.timeline
     }
 
     /// Share of keystrokes that hit the right character, as a percentage.

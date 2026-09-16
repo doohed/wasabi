@@ -1,6 +1,7 @@
 mod art;
 mod banner;
 mod footer;
+mod graph;
 mod header;
 mod menu;
 mod records;
@@ -100,8 +101,10 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
 /// The test itself: the text while the clock runs, the score once it stops.
 fn test(frame: &mut Frame, area: Rect, app: &App) {
+    // The results ask for their own size, because how much of themselves they
+    // can show depends on how much room there is.
     let (width, height) = if app.is_over() {
-        (results::WIDTH, results::HEIGHT)
+        results::size(area)
     } else {
         (CONTENT_WIDTH, TEXT_HEIGHT)
     };
