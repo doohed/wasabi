@@ -3,7 +3,7 @@
 A terminal typing test. Written in Rust with
 [ratatui](https://ratatui.rs). (credits to the ascii art creator)
 
-<img width="400" height="290" alt="wasabi" src="https://github.com/user-attachments/assets/1b2780dc-30c3-4126-89c7-26a00d4ddbc5" />
+<img width="1000" height="725" alt="wasabie" src="https://github.com/user-attachments/assets/47af3ff5-9797-4ef0-964d-3b49a68411a0" />
 
 
 I build this just to learn how to use [ratatui](https://ratatui.rs) and for hobbie, I really liked the looks and decided to keep maintaining it.
