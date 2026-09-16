@@ -106,6 +106,7 @@ fn banner_key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => app.back(),
         KeyCode::Char('e') => app.request_edit(EditTarget::Banner),
+        KeyCode::Char('b') => app.toggle_banner(),
         KeyCode::Char('r') => app.reload_banner(),
         KeyCode::Char('x') => app.reset_banner(),
         _ => {}

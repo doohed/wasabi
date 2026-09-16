@@ -13,10 +13,17 @@ I build this just to learn how to use [ratatui](https://ratatui.rs) and for hobb
 ```sh
 git clone https://github.com/doohed/wasabi.git
 cd wasabi
-cargo run --release
+./install.sh
 ```
 
-Requires a recent Rust toolchain. No other system dependencies.
+That builds it and drops the binary somewhere on your `PATH`, so you can run
+`wasabi` from anywhere. `./install.sh --uninstall` removes it again, leaving
+your records and settings alone. Set `INSTALL_DIR` to choose where it goes.
+
+To run it without installing, `cargo run --release`.
+
+Requires a recent Rust toolchain. No other system dependencies — the built-in
+ASCII art is compiled into the binary, so there is nothing to ship beside it.
 
 ## Keys
 
@@ -75,8 +82,13 @@ The ASCII art above the test is yours to replace.
 | key | |
 |---|---|
 | `e` | open it in `$EDITOR`, seeded with the current art |
+| `b` | turn the banner off, or back on |
 | `r` | reload it from disk |
 | `x` | remove it and go back to the built-in |
+
+With the banner off the test sits in the middle of the screen instead of
+hanging below the art. Off is a preference, not a deletion — your art stays on
+disk, and `b` brings it straight back. `x` is what removes it.
 
 Art is read from `banner.txt` (see [Files](#files)). Anything goes as long as
 it's text — the app measures whatever you save and lays out around it.
@@ -140,7 +152,7 @@ State lives in `$XDG_DATA_HOME/wasabi`, falling back to
 | file | |
 |---|---|
 | `records.tsv` | personal bests, one tab-separated line per test length |
-| `settings.tsv` | `key<TAB>value` preferences — the theme and your test length |
+| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner on/off |
 | `banner.txt` | your ASCII art, absent until you make one |
 | `themes.conf` | your own palettes, absent until you press `e` in the picker |
 
@@ -173,6 +185,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 122 tests, no terminal required
+cargo test     # 127 tests, no terminal required
 cargo clippy --all-targets
 ```

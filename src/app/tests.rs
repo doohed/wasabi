@@ -417,6 +417,37 @@ fn the_theme_starts_on_the_default() {
 }
 
 #[test]
+fn the_banner_can_be_turned_off_and_back_on() {
+    let mut app = app(&["cat"]);
+    assert!(app.banner_shown());
+
+    app.toggle_banner();
+    assert!(!app.banner_shown());
+    assert!(app.status().is_some_and(|s| s.contains("off")));
+
+    app.toggle_banner();
+    assert!(app.banner_shown());
+}
+
+#[test]
+fn turning_the_banner_off_is_remembered() {
+    let mut app = app(&["cat"]);
+    app.toggle_banner();
+
+    assert!(!app.settings.banner_shown());
+}
+
+#[test]
+fn turning_the_banner_off_leaves_the_art_alone() {
+    let mut app = app(&["cat"]);
+    let art = app.banner().art().to_string();
+    app.toggle_banner();
+
+    // Off is a preference, not a deletion — `x` is what removes art.
+    assert_eq!(app.banner().art(), art);
+}
+
+#[test]
 fn the_banner_colour_comes_from_the_theme() {
     let mut app = app(&["cat"]);
     let first = app.themes().all()[0].banner;

@@ -11,7 +11,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let keys = match app.screen {
         Screen::Test => " tab restart · esc menu · ctrl-c quit ",
         Screen::Menu => " ↑↓ move · enter select · esc back ",
-        Screen::Banner => " e edit · r reload · x remove · esc back ",
+        Screen::Banner => " e edit · b on/off · r reload · x remove · esc back ",
         Screen::Theme => " ↑↓ preview · e edit · r reload · esc back ",
         Screen::Records => " esc back ",
     };

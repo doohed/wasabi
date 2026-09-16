@@ -10,8 +10,8 @@ use crate::theme::Theme;
 
 /// Width of the banner box, in columns.
 pub const WIDTH: u16 = 60;
-/// Ten content rows, plus a row of padding top and bottom, plus the border.
-pub const HEIGHT: u16 = 14;
+/// Eleven content rows, plus a row of padding top and bottom, plus the border.
+pub const HEIGHT: u16 = 15;
 
 const LABEL_WIDTH: usize = 8;
 
@@ -46,6 +46,17 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, screen_height: u16) {
         "the built-in art"
     };
 
+    // Off is the first thing to say: it explains every other row at once,
+    // rather than leaving someone to wonder why art that "fits" isn't there.
+    let (source, source_colour) = if app.banner_shown() {
+        (source.to_string(), theme.accent)
+    } else {
+        (
+            format!("off — {source} when you turn it back on"),
+            theme.dim,
+        )
+    };
+
     let file = match banner.path() {
         Some(path) => storage::tilde(path),
         None => "nowhere to save (no $HOME)".to_string(),
@@ -55,7 +66,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, screen_height: u16) {
     // and footer. Built from the same constants `ui::with_art` checks against,
     // so this can't claim art fits when it doesn't.
     let needed = super::rows_for_art(banner.height());
-    let (size, size_colour) = if needed <= screen_height {
+    let (size, size_colour) = if !app.banner_shown() {
+        // Reporting a fit for art nobody is drawing would just be noise.
+        (
+            format!("{} × {}", banner.width(), banner.height()),
+            theme.dim,
+        )
+    } else if needed <= screen_height {
         (
             format!("{} × {}", banner.width(), banner.height()),
             theme.accent,
@@ -89,12 +106,21 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, screen_height: u16) {
     ]);
 
     let mut lines = vec![
-        field("showing", source.to_string(), theme.accent, theme),
+        field("showing", source, source_colour, theme),
         field("file", file, theme.accent, theme),
         field("size", size, size_colour, theme),
         colour,
         Line::from(""),
         key("e", "edit it in $EDITOR", theme),
+        key(
+            "b",
+            if app.banner_shown() {
+                "turn it off, and centre the test"
+            } else {
+                "turn it back on"
+            },
+            theme,
+        ),
         key("r", "reload it from disk", theme),
         key("x", "remove it and use the built-in", theme),
         Line::from(""),

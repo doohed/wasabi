@@ -6,6 +6,7 @@ use crate::storage;
 const FILE: &str = "settings.tsv";
 const THEME: &str = "theme";
 const DURATION: &str = "duration";
+const BANNER: &str = "banner";
 
 /// Persisted preferences.
 ///
@@ -66,6 +67,23 @@ impl Settings {
     pub fn set_duration(&mut self, seconds: u64) {
         self.values
             .insert(DURATION.to_string(), seconds.to_string());
+        self.save();
+    }
+
+    /// Whether the art above the test should be drawn at all.
+    ///
+    /// Defaults to on, and anything unrecognised reads as on: a typo in a
+    /// hand-edited file shouldn't make the art quietly disappear.
+    pub fn banner_shown(&self) -> bool {
+        !matches!(
+            self.values.get(BANNER).map(String::as_str),
+            Some("off" | "false" | "no" | "0")
+        )
+    }
+
+    pub fn set_banner_shown(&mut self, shown: bool) {
+        let value = if shown { "on" } else { "off" };
+        self.values.insert(BANNER.to_string(), value.to_string());
         self.save();
     }
 
@@ -140,6 +158,28 @@ mod tests {
             .insert(DURATION.to_string(), "ages".to_string());
 
         assert_eq!(settings.duration(), None);
+    }
+
+    #[test]
+    fn the_banner_is_shown_unless_turned_off() {
+        let mut settings = Settings::detached();
+        assert!(settings.banner_shown());
+
+        settings.set_banner_shown(false);
+        assert!(!settings.banner_shown());
+
+        settings.set_banner_shown(true);
+        assert!(settings.banner_shown());
+    }
+
+    #[test]
+    fn an_unrecognised_banner_value_leaves_it_on() {
+        let mut settings = Settings::detached();
+        settings
+            .values
+            .insert(BANNER.to_string(), "maybe".to_string());
+
+        assert!(settings.banner_shown());
     }
 
     #[test]

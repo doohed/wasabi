@@ -131,6 +131,10 @@ fn test(frame: &mut Frame, area: Rect, app: &App) {
 /// The art is the first thing dropped when the terminal is small: a typing
 /// test with no text box is useless, one with no picture is merely plainer.
 fn with_art(frame: &mut Frame, area: Rect, app: &App, content_height: u16) -> Option<Rect> {
+    if !app.banner_shown() {
+        return None;
+    }
+
     let banner = app.banner();
 
     if area.width < banner.width()

@@ -341,6 +341,25 @@ impl App {
         &self.banner
     }
 
+    /// Whether the user wants the art drawn at all.
+    ///
+    /// Only the preference — whether it *fits* is the layout's business.
+    pub fn banner_shown(&self) -> bool {
+        self.settings.banner_shown()
+    }
+
+    /// Turn the art on or off, and remember which.
+    pub fn toggle_banner(&mut self) {
+        let shown = !self.banner_shown();
+        self.settings.set_banner_shown(shown);
+
+        self.status = Some(if shown {
+            "banner on".to_string()
+        } else {
+            "banner off — the test sits in the middle".to_string()
+        });
+    }
+
     /// The banner's colour, which comes from the theme like every other
     /// colour in the interface.
     pub fn banner_colour(&self) -> ratatui::style::Color {
