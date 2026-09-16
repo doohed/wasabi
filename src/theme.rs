@@ -59,6 +59,21 @@ const FIELDS: [Field; 9] = [
     ("banner", |t| &mut t.banner),
 ];
 
+impl Theme {
+    /// Every colour the theme sets, in the order a theme file lists them.
+    ///
+    /// Read through [`FIELDS`] — the same table the parser writes through — so
+    /// a colour added to [`Theme`] shows up in the picker without anyone
+    /// having to remember to put it there. The clone is what lets a read go
+    /// through accessors written for the parser's `&mut`; against a list nine
+    /// entries long, that is cheaper than a second table to keep in step.
+    pub fn palette(&self) -> [Color; FIELDS.len()] {
+        let mut theme = self.clone();
+
+        FIELDS.map(|(_, field)| *field(&mut theme))
+    }
+}
+
 /// Themes that ship with the app.
 ///
 /// `default` is built from *named* terminal colours, so it inherits whatever
@@ -510,6 +525,31 @@ mod tests {
 
         assert_eq!(themes[0].accent, base().accent);
         assert_eq!(themes[0].banner, base().banner);
+    }
+
+    #[test]
+    fn the_palette_is_every_settable_colour_in_file_order() {
+        let mut theme = base();
+        theme.text = Color::Rgb(1, 0, 0);
+        theme.banner = Color::Rgb(0, 0, 9);
+
+        let palette = theme.palette();
+
+        // One chip per field the picker could otherwise silently drop, and
+        // `text` first / `banner` last, as the file lists them.
+        assert_eq!(palette.len(), FIELDS.len());
+        assert_eq!(palette[0], Color::Rgb(1, 0, 0));
+        assert_eq!(palette[FIELDS.len() - 1], Color::Rgb(0, 0, 9));
+    }
+
+    #[test]
+    fn reading_the_palette_leaves_the_theme_alone() {
+        // It goes through accessors written for the parser's `&mut`.
+        let theme = base();
+        let before = theme.clone();
+        let _ = theme.palette();
+
+        assert_eq!(theme, before);
     }
 
     #[test]

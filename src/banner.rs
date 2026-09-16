@@ -202,7 +202,8 @@ mod tests {
             widths.iter().all(|width| *width == widths[0]),
             "ragged widths: {widths:?}"
         );
-        assert_eq!(banner.height(), 30);
+        assert_eq!(banner.height(), 20);
+        assert_eq!(banner.width(), 41);
     }
 
     #[test]

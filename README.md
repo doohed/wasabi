@@ -150,7 +150,9 @@ own theme.
 | `r` | reload it from disk |
 
 One `[name]` block per theme. Every field is optional — anything you leave out
-keeps the default theme's colour, so a two-line theme is perfectly valid:
+keeps the default theme's colour, so a two-line theme is perfectly valid. The
+picker shows each theme's nine colours in the order below, so the row and the
+file you edit read the same way round:
 
 ```ini
 [tokyonight]
@@ -230,6 +232,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 166 tests, no terminal required
+cargo test     # 168 tests, no terminal required
 cargo clippy --all-targets
 ```

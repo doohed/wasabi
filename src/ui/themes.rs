@@ -9,7 +9,16 @@ use crate::storage;
 use crate::theme::Theme;
 
 /// Width of the picker, in columns.
-pub const WIDTH: u16 = 58;
+///
+/// Set by the widest row: the name, the palette, and the marker beside a
+/// theme of the user's own — with room for the longest reload message.
+pub const WIDTH: u16 = 52;
+
+/// Columns one colour of the palette gets.
+///
+/// Wide enough to judge a hue by, and narrow enough that nine of them sit
+/// beside the name rather than pushing it off the row.
+const SWATCH_WIDTH: usize = 2;
 
 /// Most theme rows shown at once.
 ///
@@ -43,34 +52,27 @@ fn offset(selected: usize, total: usize, visible: usize) -> usize {
     }
 }
 
-/// A miniature of the typing test, in that theme's colours.
+/// The theme's whole palette, as a row of chips.
 ///
-/// Every state the test can put a character in appears exactly once: typed
-/// correctly, mistyped, overflowed past the end of a word, and not yet
-/// reached. A block of colour tells you a theme's hues; this tells you whether
-/// you could actually type in it.
-fn sample(theme: &Theme) -> Vec<Span<'static>> {
-    [
-        ("the quick ", theme.text),
-        // Mistyped. Shows the expected character, exactly as the test does.
-        ("b", theme.error),
-        ("rown", theme.text),
-        // Typed past the end of the word.
-        ("zz", theme.extra),
-        // Not reached yet.
-        (" fox", theme.dim),
-    ]
-    .into_iter()
-    .map(|(text, colour)| Span::styled(text, Style::default().fg(colour)))
-    .collect()
-}
-
-/// The two colours the sample can't show: panel accents, and the art.
+/// In the order a theme file lists them, so the row and the file you edit read
+/// the same way round. Spaced rather than butted together: `text`, `muted` and
+/// `dim` are three neutrals in a row, and with no gap between them a palette's
+/// near-identical colours read as one wider block instead of two.
 fn swatch(theme: &Theme) -> Vec<Span<'static>> {
-    [theme.accent, theme.banner]
-        .into_iter()
-        .map(|colour| Span::styled("██", Style::default().fg(colour)))
-        .collect()
+    let mut spans = Vec::new();
+
+    for colour in theme.palette() {
+        if !spans.is_empty() {
+            spans.push(Span::raw(" "));
+        }
+
+        spans.push(Span::styled(
+            "█".repeat(SWATCH_WIDTH),
+            Style::default().fg(colour),
+        ));
+    }
+
+    spans
 }
 
 fn key(key: &str, what: &str, theme: &Theme) -> Line<'static> {
@@ -108,7 +110,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 Span::raw(if highlighted { " › " } else { "   " }),
                 Span::styled(format!(" {:<11}", theme.name), label),
             ];
-            spans.extend(sample(theme));
             spans.push(Span::raw("  "));
             spans.extend(swatch(theme));
             // Marks a theme as one of the user's own, so it's obvious which
