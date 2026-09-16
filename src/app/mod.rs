@@ -554,6 +554,17 @@ impl App {
             .is_some_and(|word| !word.typed.is_empty());
 
         if typed_something {
+            // The space that commits a word is a keystroke like any other.
+            // [`App::correct_chars`] credits one per committed word, because
+            // the standard WPM definition counts the space inside the five
+            // characters of a "word" — so leaving it out here would score
+            // `wpm` and `raw_wpm` over different text, and `raw_wpm` would
+            // come out *below* the figure it is supposed to bound.
+            //
+            // Never a mistake: pressing space to end a word is the right key
+            // whether or not the word it ended was typed correctly, which is
+            // the same call `correct_chars` makes.
+            self.keystrokes += 1;
             self.cursor_word += 1;
         }
 
@@ -622,7 +633,9 @@ impl App {
     /// Words per minute counting every keystroke, right or wrong.
     ///
     /// The speed of the fingers where [`App::wpm`] is the speed of the typing:
-    /// the gap between the two is what the mistakes cost.
+    /// the gap between the two is what the mistakes cost. Never below
+    /// [`App::wpm`] — both count the same characters, and this one stops
+    /// short of asking whether they were the right ones.
     pub fn raw_wpm(&self) -> Option<f64> {
         let elapsed = self.elapsed();
         if elapsed < MIN_ELAPSED {

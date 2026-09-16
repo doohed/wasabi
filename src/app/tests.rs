@@ -171,6 +171,69 @@ fn correct_chars_counts_committed_spaces() {
 }
 
 #[test]
+fn the_space_that_commits_a_word_is_a_keystroke() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat do");
+
+    // The same six characters `correct_chars` counts. Counting the space on
+    // one side and not the other scored the two speeds over different text,
+    // and put `raw_wpm` below the figure it is supposed to bound.
+    assert_eq!(app.keystrokes(), 6);
+    assert_eq!(app.mistakes(), 0);
+    assert_eq!(app.accuracy(), 100.0);
+}
+
+#[test]
+fn the_space_after_a_botched_word_is_still_the_right_key() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cxt ");
+
+    // One bad letter, and a space that was exactly the key to press — the
+    // word's own errors are charged against the word, not against the space.
+    assert_eq!(app.keystrokes(), 4);
+    assert_eq!(app.mistakes(), 1);
+}
+
+#[test]
+fn a_space_that_commits_nothing_costs_nothing() {
+    let mut app = app(&["cat"]);
+    type_str(&mut app, "  ");
+
+    assert_eq!(app.keystrokes(), 0);
+    assert_eq!(app.accuracy(), 100.0);
+}
+
+#[test]
+fn raw_wpm_never_falls_below_wpm() {
+    let mut app = app(&["cat", "dog", "emu"]);
+    type_str(&mut app, "cat dgo emu");
+
+    let now = Instant::now();
+    app.started_at = Some(now - Duration::from_secs(10));
+    app.ended_at = Some(now);
+
+    let wpm = app.wpm().expect("ten seconds is plenty");
+    let raw = app.raw_wpm().expect("likewise");
+
+    // Both count the same characters; raw just stops short of asking whether
+    // they were the right ones, so a run with mistakes has to leave a gap.
+    assert!(raw > wpm, "raw {raw} should clear wpm {wpm}");
+}
+
+#[test]
+fn a_perfect_run_scores_the_same_either_way() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat dog");
+
+    let now = Instant::now();
+    app.started_at = Some(now - Duration::from_secs(10));
+    app.ended_at = Some(now);
+
+    // Nothing was thrown away, so there is nothing for raw to add.
+    assert_eq!(app.wpm(), app.raw_wpm());
+}
+
+#[test]
 fn wrong_characters_dont_score() {
     let mut app = app(&["cat"]);
     type_str(&mut app, "cxt");

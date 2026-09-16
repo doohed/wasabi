@@ -47,9 +47,11 @@ In the menu, `↑↓` (or `j`/`k`) moves, `enter` selects, `esc` goes back.
 over elapsed minutes. Incorrect and overflow characters score nothing, so
 mistakes drag the number down.
 
-**Raw WPM** is the same sum counting every keystroke, right or wrong. It's the
-speed of your fingers where WPM is the speed of your typing, and the gap
-between the two is what the mistakes cost you.
+**Raw WPM** is the same sum counting every keystroke, right or wrong — spaces
+included, exactly like WPM. It's the speed of your fingers where WPM is the
+speed of your typing, and the gap between the two is what the mistakes cost
+you. It can never be the lower of the pair: both count the same characters,
+and raw just stops short of asking whether they were the right ones.
 
 **Accuracy** is charged at keystroke time. Fixing a typo still costs you — the
 mistake happened, and a typing test that forgives it is measuring the wrong
@@ -228,6 +230,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 158 tests, no terminal required
+cargo test     # 166 tests, no terminal required
 cargo clippy --all-targets
 ```
