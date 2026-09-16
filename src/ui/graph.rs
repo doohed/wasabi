@@ -7,6 +7,7 @@ use ratatui::Frame;
 
 use crate::app::App;
 use crate::theme::Theme;
+use crate::timeline::Sample;
 
 /// Rows the caption under the plot takes.
 const CAPTION_HEIGHT: u16 = 1;
@@ -46,17 +47,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     // Owned, because a `Dataset` borrows its points for as long as it lives.
-    let wpm: Vec<(f64, f64)> = timeline
-        .samples()
-        .iter()
-        .map(|sample| (sample.at, sample.wpm))
-        .collect();
-
-    let raw: Vec<(f64, f64)> = timeline
-        .samples()
-        .iter()
-        .map(|sample| (sample.at, sample.raw))
-        .collect();
+    let wpm = line(timeline.samples(), |sample| sample.wpm);
+    let raw = line(timeline.samples(), |sample| sample.raw);
 
     // Marked on the raw line rather than on the score: a mistake belongs to
     // the second you made it in, and that is the line that shows that second.
@@ -68,6 +60,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .collect();
 
     let top = (ceiling / GRIDLINE).ceil().max(1.0) * GRIDLINE;
+
+    // Whole seconds, so the labels of a 15s test read 0s / 8s / 15s. The
+    // readings land a few milliseconds late — a frame can't fire on the
+    // instant — and labelling that honestly would put "7s" in the middle of a
+    // fifteen second test.
+    let span = span.round().max(1.0);
 
     let datasets = vec![
         // Raw first, so the score is drawn over it where the two cross.
@@ -111,10 +109,29 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 /// Three labels for an axis running from zero to `end`, `unit` appended.
+///
+/// Rounded here rather than left to the formatter, which breaks a tie towards
+/// the even number: half of five is three, not two.
 fn ticks(end: f64, unit: &str) -> Vec<Line<'static>> {
     [0.0, end / 2.0, end]
-        .map(|value| Line::from(format!("{value:.0}{unit}")))
+        .map(|value| Line::from(format!("{}{unit}", value.round())))
         .to_vec()
+}
+
+/// The points of one line, anchored at the left edge of the plot.
+///
+/// A reading describes the second *ending* at its timestamp, so the first one
+/// sits a whole second in and leaves the line starting in mid-air, clear of
+/// the axis. Repeating it at zero draws it across the second it actually
+/// covers — a flat start rather than a gap, and without inventing a climb the
+/// run didn't have.
+fn line(samples: &[Sample], value: fn(&Sample) -> f64) -> Vec<(f64, f64)> {
+    let anchor = samples.first().map(|first| (0.0, value(first)));
+
+    anchor
+        .into_iter()
+        .chain(samples.iter().map(|sample| (sample.at, value(sample))))
+        .collect()
 }
 
 /// What the two lines and the dots mean.
@@ -165,5 +182,41 @@ mod tests {
         // The last reading lands a fraction past the end of the clock, and
         // "30s" is what the user set the test to.
         assert_eq!(text(ticks(30.07, "s")), ["0s", "15s", "30s"]);
+    }
+
+    #[test]
+    fn an_odd_length_gets_a_whole_second_in_the_middle() {
+        // Half of fifteen is 7.5, and the formatter alone would call that 8
+        // here and 2 for a span of 5 — so it isn't left to the formatter.
+        assert_eq!(text(ticks(15.0, "s")), ["0s", "8s", "15s"]);
+        assert_eq!(text(ticks(5.0, "s")), ["0s", "3s", "5s"]);
+    }
+
+    /// Readings a second apart, each `raw` faster than the last.
+    fn samples(count: usize) -> Vec<Sample> {
+        (1..=count)
+            .map(|second| Sample {
+                at: second as f64,
+                wpm: 50.0,
+                raw: second as f64 * 10.0,
+                mistakes: 0,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_line_starts_at_the_axis_rather_than_a_second_in() {
+        let points = line(&samples(3), |sample| sample.raw);
+
+        assert_eq!(points.len(), 4);
+        // The first reading, drawn across the second it describes.
+        assert_eq!(points[0], (0.0, 10.0));
+        assert_eq!(points[1], (1.0, 10.0));
+        assert_eq!(points[3], (3.0, 30.0));
+    }
+
+    #[test]
+    fn a_line_with_no_readings_has_nothing_to_anchor() {
+        assert!(line(&[], |sample| sample.raw).is_empty());
     }
 }

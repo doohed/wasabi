@@ -30,7 +30,7 @@ const FOOTER_HEIGHT: u16 = 1;
 /// Blank rows between the header and the top of the art.
 const ART_GAP: u16 = 1;
 /// Blank rows between the bottom of the art and the text.
-const TEXT_GAP: u16 = 4;
+const TEXT_GAP: u16 = 2;
 /// Everything the screen owes to something other than the body.
 const CHROME_HEIGHT: u16 = HEADER_HEIGHT + FOOTER_HEIGHT;
 
