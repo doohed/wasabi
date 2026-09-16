@@ -1,12 +1,12 @@
 # wasabi
 
 A terminal typing test. Written in Rust with
-[ratatui](https://ratatui.rs).
+[ratatui](https://ratatui.rs). (credits to the ascii art creator)
 
 <img width="1447" height="930" alt="image" src="https://github.com/user-attachments/assets/e22d2e87-eeac-491b-836b-34c0a1d52128" />
 
 
-I build this just to learn how to use [ratatui](https://ratatui.rs), nothing else.
+I build this just to learn how to use [ratatui](https://ratatui.rs) and for hobbie, I really liked the looks and decided to keep maintaining it.
 
 ## Install
 
