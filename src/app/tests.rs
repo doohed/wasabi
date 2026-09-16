@@ -329,6 +329,47 @@ fn choosing_a_duration_restarts_the_test() {
 }
 
 #[test]
+fn choosing_a_duration_remembers_it_for_next_time() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Duration(15));
+    app.menu_select();
+
+    assert_eq!(app.settings.duration(), Some(15));
+}
+
+#[test]
+fn a_stored_duration_is_used_at_startup() {
+    let mut settings = Settings::detached();
+    settings.set_duration(60);
+    let app = App::build(
+        Records::default(),
+        Banner::detached(),
+        settings,
+        Themes::detached(),
+    );
+
+    assert_eq!(app.duration(), Duration::from_secs(60));
+    // The menu opens on it, rather than on the default.
+    assert_eq!(MENU[app.duration_index()], MenuItem::Duration(60));
+}
+
+#[test]
+fn a_duration_the_menu_cant_show_falls_back_to_the_default() {
+    // Someone hand-edited settings.tsv to a length with no menu row.
+    let mut settings = Settings::detached();
+    settings.set_duration(45);
+    let app = App::build(
+        Records::default(),
+        Banner::detached(),
+        settings,
+        Themes::detached(),
+    );
+
+    assert_eq!(app.duration(), Duration::from_secs(DEFAULT_DURATION));
+}
+
+#[test]
 fn the_countdown_follows_the_chosen_duration() {
     let mut app = app(&["cat"]);
     app.open_menu();

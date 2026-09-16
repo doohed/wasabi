@@ -55,8 +55,8 @@ Press `esc`, then pick a row.
 
 ### Test length
 
-15, 30 or 60 seconds. Changing it always restarts — a half-typed test measured
-against a different clock would be meaningless.
+15, 30 or 60 seconds, remembered between sessions. Changing it always restarts
+— a half-typed test measured against a different clock would be meaningless.
 
 ### Records
 
@@ -140,7 +140,7 @@ State lives in `$XDG_DATA_HOME/wasabi`, falling back to
 | file | |
 |---|---|
 | `records.tsv` | personal bests, one tab-separated line per test length |
-| `settings.tsv` | `key<TAB>value` preferences — currently just the theme |
+| `settings.tsv` | `key<TAB>value` preferences — the theme and your test length |
 | `banner.txt` | your ASCII art, absent until you make one |
 | `themes.conf` | your own palettes, absent until you press `e` in the picker |
 
@@ -173,6 +173,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 117 tests, no terminal required
+cargo test     # 122 tests, no terminal required
 cargo clippy --all-targets
 ```

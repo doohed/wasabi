@@ -5,6 +5,7 @@ use crate::storage;
 
 const FILE: &str = "settings.tsv";
 const THEME: &str = "theme";
+const DURATION: &str = "duration";
 
 /// Persisted preferences.
 ///
@@ -50,6 +51,21 @@ impl Settings {
 
     pub fn set_theme(&mut self, name: &str) {
         self.values.insert(THEME.to_string(), name.to_string());
+        self.save();
+    }
+
+    /// The stored test length in seconds, if there is a usable one.
+    ///
+    /// `Option` rather than a default: which lengths are legal is the app's
+    /// business, not this file's, so the caller decides what to do with a
+    /// missing or unparseable value.
+    pub fn duration(&self) -> Option<u64> {
+        self.values.get(DURATION)?.parse().ok()
+    }
+
+    pub fn set_duration(&mut self, seconds: u64) {
+        self.values
+            .insert(DURATION.to_string(), seconds.to_string());
         self.save();
     }
 
@@ -105,6 +121,25 @@ mod tests {
         settings.set_theme("nord");
 
         assert_eq!(settings.theme(), "nord");
+    }
+
+    #[test]
+    fn a_duration_reads_back_after_being_set() {
+        let mut settings = Settings::detached();
+        assert_eq!(settings.duration(), None);
+
+        settings.set_duration(15);
+        assert_eq!(settings.duration(), Some(15));
+    }
+
+    #[test]
+    fn a_duration_that_isnt_a_number_reads_as_absent() {
+        let mut settings = Settings::detached();
+        settings
+            .values
+            .insert(DURATION.to_string(), "ages".to_string());
+
+        assert_eq!(settings.duration(), None);
     }
 
     #[test]

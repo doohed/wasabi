@@ -160,13 +160,20 @@ impl App {
 
     /// The single constructor both of those go through.
     fn build(records: Records, banner: Banner, settings: Settings, themes: Themes) -> Self {
+        // Only a length the menu can represent: an arbitrary number from a
+        // hand-edited file would run a test the menu couldn't show you.
+        let seconds = settings
+            .duration()
+            .filter(|seconds| DURATIONS.contains(seconds))
+            .unwrap_or(DEFAULT_DURATION);
+
         let mut app = Self {
             words: Vec::new(),
             cursor_word: 0,
             should_quit: false,
             screen: Screen::Test,
             menu_index: 0,
-            duration: Duration::from_secs(DEFAULT_DURATION),
+            duration: Duration::from_secs(seconds),
             records,
             new_best: false,
             banner,
@@ -256,10 +263,13 @@ impl App {
             .unwrap_or(0)
     }
 
-    /// Change the test length. Always restarts: a half-typed test measured
-    /// against a different clock would be meaningless.
+    /// Change the test length, and remember it for next time.
+    ///
+    /// Always restarts: a half-typed test measured against a different clock
+    /// would be meaningless.
     fn set_duration(&mut self, seconds: u64) {
         self.duration = Duration::from_secs(seconds);
+        self.settings.set_duration(seconds);
         self.restart();
     }
 
