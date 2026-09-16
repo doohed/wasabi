@@ -10,12 +10,12 @@ use crate::records;
 /// Width of the records box, in columns.
 pub const WIDTH: u16 = 48;
 
-/// Content rows: a heading, the blank under it, and one row per duration.
-/// Derived rather than written out, so adding a duration can't silently clip
-/// the last row off the bottom.
+/// Content rows: the column headings, the blank under them, and one row per
+/// duration. Derived rather than written out, so adding a duration can't
+/// silently clip the last row off the bottom.
 const ROWS: u16 = DURATIONS.len() as u16 + 2;
 /// The rows, plus a row of padding top and bottom, plus the border.
-pub const HEIGHT: u16 = ROWS + 4;
+pub const HEIGHT: u16 = ROWS + 3;
 
 /// Shown where there is no record yet — an em dash reads as "nothing here",
 /// where a zero would read as a score of zero.

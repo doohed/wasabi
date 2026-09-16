@@ -9,8 +9,8 @@ use crate::theme::Theme;
 
 /// Width of the results box, in columns.
 pub const WIDTH: u16 = 44;
-/// A border, a row of padding each side, and six rows of score.
-pub const HEIGHT: u16 = 10;
+/// Six rows of score, plus the heading and a row of padding each side.
+pub const HEIGHT: u16 = 9;
 
 /// Width the labels are padded to. Every row is the same total width, so
 /// centring the lines individually still leaves the columns aligned.
@@ -75,10 +75,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // which record it was competing for.
     let results = Paragraph::new(lines)
         .alignment(Alignment::Center)
-        .block(super::panel(
-            format!(" {}s test ", app.duration().as_secs()),
-            theme,
-        ));
+        // Centred, unlike the other panels: this one's content is centred
+        // too, and a heading hugging the left edge above it reads as a
+        // mistake rather than a choice.
+        .block(
+            super::panel(format!(" {}s test ", app.duration().as_secs()), theme)
+                .title_alignment(Alignment::Center),
+        );
 
     frame.render_widget(results, area);
 }

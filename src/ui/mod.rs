@@ -47,15 +47,15 @@ pub(super) fn rows_for_art(art_height: u16) -> u16 {
     body_rows_for_art(art_height, TEXT_HEIGHT) + CHROME_HEIGHT
 }
 
-/// A bordered panel in the current palette.
+/// A panel in the current palette: a heading, and room to breathe.
 ///
-/// Every overlay is built here, so a theme reaches the frame around the
-/// content and not just the content itself. The border sits in `dim` because
-/// it is structure rather than information; the title takes the accent, since
-/// it is the one word naming what you are looking at.
+/// No border. A box drawn round every overlay competes with the text for
+/// attention, and in a typing test the text has to win; the accented heading
+/// and the padding are enough to say where a panel starts. A borderless block
+/// still puts its title on the first row, so this costs one row rather than
+/// the two a frame would.
 fn panel(title: impl Into<String>, theme: &Theme) -> Block<'static> {
-    Block::bordered()
-        .border_style(Style::default().fg(theme.dim))
+    Block::new()
         .title(Span::styled(
             title.into(),
             Style::default().fg(theme.accent),

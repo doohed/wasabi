@@ -10,8 +10,8 @@ use crate::theme::Theme;
 
 /// Width of the banner box, in columns.
 pub const WIDTH: u16 = 60;
-/// Eleven content rows, plus a row of padding top and bottom, plus the border.
-pub const HEIGHT: u16 = 15;
+/// Eleven content rows, plus the heading and a row of padding each side.
+pub const HEIGHT: u16 = 14;
 
 const LABEL_WIDTH: usize = 8;
 

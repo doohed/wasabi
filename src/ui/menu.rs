@@ -8,8 +8,8 @@ use crate::app::{App, MenuItem, MENU};
 
 /// Width of the menu box, in columns.
 pub const WIDTH: u16 = 30;
-/// A border and a row of padding top and bottom, around one row per item.
-pub const HEIGHT: u16 = MENU.len() as u16 + 4;
+/// One row per item, plus the heading and a row of padding each side.
+pub const HEIGHT: u16 = MENU.len() as u16 + 3;
 
 fn label(item: MenuItem) -> String {
     match item {

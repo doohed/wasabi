@@ -29,7 +29,7 @@ fn visible(app: &App) -> usize {
 /// Height the picker needs, which depends on how many themes exist.
 pub fn height(app: &App) -> u16 {
     // The rows, the footer, a row of padding top and bottom, and the border.
-    visible(app) as u16 + FOOTER_ROWS + 4
+    visible(app) as u16 + FOOTER_ROWS + 3
 }
 
 /// First row to draw, so the selection is always on screen.
