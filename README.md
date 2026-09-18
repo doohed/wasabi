@@ -4,6 +4,8 @@ A terminal typing test. Written in Rust with
 [ratatui](https://ratatui.rs). (credits to the ascii art creator)
 
 <img width="1000" height="725" alt="wasabie" src="https://github.com/user-attachments/assets/47af3ff5-9797-4ef0-964d-3b49a68411a0" />
+<img width="1000" height="725" alt="code-test" src="https://github.com/user-attachments/assets/6d203a3d-3814-4746-b0ab-9c411a1c5ba7" />
+
 
 I built this just to learn how to use [ratatui](https://ratatui.rs), and for a
 hobby. I really liked the looks and decided to keep maintaining it.
@@ -34,7 +36,8 @@ snippets are compiled into the binary.
 
 Press `esc`, to access settings.
 
-<img width="493" height="345" alt="image" src="https://github.com/user-attachments/assets/cd9fae4f-a904-4ad0-b81f-921b6a8f6bb8" />
+<img width="1164" height="840" alt="image" src="https://github.com/user-attachments/assets/f04e1500-febd-455f-b30b-c01152fa0197" />
+
 
 ### Words
 
