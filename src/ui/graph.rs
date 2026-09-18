@@ -19,6 +19,14 @@ const CAPTION_HEIGHT: u16 = 1;
 /// that look nothing alike.
 const GRIDLINE: f64 = 20.0;
 
+/// Where the speed axis ends, given the highest point it has to fit.
+///
+/// Shared with the progress graph rather than written twice, so the two charts
+/// in the app can't end up rounding their speeds differently.
+pub(super) fn top(ceiling: f64) -> f64 {
+    (ceiling / GRIDLINE).ceil().max(1.0) * GRIDLINE
+}
+
 /// Shown in place of the plot when the run was too short to read even once.
 const TOO_SHORT: &str = "not enough of a run to plot";
 
@@ -59,7 +67,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .map(|sample| (sample.at, sample.raw))
         .collect();
 
-    let top = (ceiling / GRIDLINE).ceil().max(1.0) * GRIDLINE;
+    let top = top(ceiling);
 
     // Whole seconds, so the labels of a 15s test read 0s / 8s / 15s. The
     // readings land a few milliseconds late — a frame can't fire on the
@@ -112,7 +120,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 ///
 /// Rounded here rather than left to the formatter, which breaks a tie towards
 /// the even number: half of five is three, not two.
-fn ticks(end: f64, unit: &str) -> Vec<Line<'static>> {
+pub(super) fn ticks(end: f64, unit: &str) -> Vec<Line<'static>> {
     [0.0, end / 2.0, end]
         .map(|value| Line::from(format!("{}{unit}", value.round())))
         .to_vec()

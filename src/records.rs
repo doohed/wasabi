@@ -96,7 +96,11 @@ fn records_path() -> Option<PathBuf> {
     Some(crate::storage::data_dir()?.join("records.tsv"))
 }
 
-fn unix_now() -> u64 {
+/// Now, in unix seconds.
+///
+/// The history stamps its runs from here too, so both files read the clock the
+/// same way and [`age`] can be pointed at either.
+pub fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |since| since.as_secs())

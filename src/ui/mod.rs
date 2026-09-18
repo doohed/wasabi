@@ -4,6 +4,7 @@ mod footer;
 mod graph;
 mod header;
 mod menu;
+mod progress;
 mod records;
 mod results;
 mod themes;
@@ -89,11 +90,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
             centred(body_area, themes::WIDTH, themes::height(app)),
             app,
         ),
-        Screen::Records => records::render(
-            frame,
-            centred(body_area, records::WIDTH, records::HEIGHT),
-            app,
-        ),
+        Screen::Records => {
+            // The records ask for their own size, because whether the plot has
+            // anything to show depends on how much you have typed.
+            let (width, height) = records::size(body_area, app);
+            records::render(frame, centred(body_area, width, height), app)
+        }
     }
 
     footer::render(frame, footer_area, app);

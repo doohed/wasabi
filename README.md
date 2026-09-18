@@ -126,6 +126,31 @@ The accuracy shown is *that run's*, not your best ever — a personal best is on
 result, and splitting it across runs would flatter you. Abandoned runs aren't
 recorded.
 
+Under the table is every run you've finished at the length the test is
+currently set to, oldest on the left. The quiet line is the runs themselves and
+the accented one is a ten-run trailing average — the same pairing as the
+results graph, where the jagged line is the moment and the smooth one is what
+it adds up to. The dot marks your best.
+
+One length rather than all three, because a 15s run and a 60s run are different
+tests: plotting them on one line would put a step in it every time you changed
+the setting and call that improvement. Change the length in the menu and the
+plot follows. The last fifty runs are shown — a line squeezing a thousand runs
+into forty columns is a texture, not a trend — but the axis numbers them by
+where they sit in your whole history, so it agrees with the `runs` column above.
+
+A trailing average rather than one taken from your very first run: a cumulative
+average stops moving once there are a few hundred runs behind it, which answers
+"how fast have you ever been" when the question is "how fast are you now". The
+speed axis starts at zero, so a good week looks like a good week rather than a
+cliff.
+
+The plot needs two runs at that length before there's a shape to draw, and it's
+the first thing dropped when the terminal is short — the bests are the record,
+and the picture is a nicer way of looking at what came after them. Nothing is
+plotted from before you upgraded: the history file starts when this version
+does, though your bests and run counts carry over untouched.
+
 ### Banner
 
 The ASCII art above the test is yours to replace.
@@ -214,6 +239,11 @@ Things the app writes live in `$XDG_DATA_HOME/wasabi`, falling back to
 | file | |
 |---|---|
 | `records.tsv` | personal bests, one tab-separated line per test length |
+| `history.tsv` | every finished run, one tab-separated line each, oldest first |
+
+`history.tsv` is append-only and never trimmed: a run is forty bytes, the file
+is read once at startup, and the early runs are the only part of it that shows
+how far you've come. Delete it and you lose the plot, not your records.
 
 The split is the XDG convention, and it earns its keep: losing your personal
 bests is losing history, losing a setting is not, so the two deserve different
@@ -235,6 +265,7 @@ src/
 ├── word.rs        one word: its target, what was typed, per-character state
 ├── wordlist.rs    the word pool
 ├── records.rs     personal bests, and their file
+├── history.rs     every finished run, and their file
 ├── timeline.rs    a reading a second, and the figures derived from them
 ├── misses.rs      which keys went wrong, and the worst of them
 ├── settings.rs    preferences, and their file
@@ -251,6 +282,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 179 tests, no terminal required
+cargo test     # 203 tests, no terminal required
 cargo clippy --all-targets
 ```

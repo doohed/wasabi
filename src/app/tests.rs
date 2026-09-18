@@ -456,6 +456,7 @@ fn a_stored_duration_is_used_at_startup() {
     settings.set_duration(60);
     let app = App::build(
         Records::default(),
+        History::default(),
         Banner::detached(),
         settings,
         Themes::detached(),
@@ -473,6 +474,7 @@ fn a_duration_the_menu_cant_show_falls_back_to_the_default() {
     settings.set_duration(45);
     let app = App::build(
         Records::default(),
+        History::default(),
         Banner::detached(),
         settings,
         Themes::detached(),
@@ -690,6 +692,67 @@ fn an_abandoned_test_is_not_a_record() {
     app.restart();
 
     assert_eq!(app.records().runs(30), 0);
+}
+
+// -- history ----------------------------------------------------------
+
+/// The speeds of every run filed at `seconds`, oldest first.
+fn history(app: &App, seconds: u64) -> Vec<f64> {
+    app.history()
+        .at(seconds)
+        .iter()
+        .map(|run| run.wpm)
+        .collect()
+}
+
+#[test]
+fn a_finished_run_is_filed_in_the_history_too() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat dog");
+    app.started_at = Some(Instant::now() - Duration::from_secs(5));
+    app.type_space();
+
+    // The same figure the records were given, not a second reading of a
+    // clock that has moved on since.
+    assert_eq!(history(&app, 30), vec![app.wpm().unwrap()]);
+}
+
+#[test]
+fn the_history_keeps_the_runs_that_weren_t_bests() {
+    let mut app = app(&["cat", "dog"]);
+
+    for seconds in [2, 25] {
+        app.restart();
+        app.words = ["cat", "dog"].into_iter().map(Word::new).collect();
+        type_str(&mut app, "cat dog");
+        app.started_at = Some(Instant::now() - Duration::from_secs(seconds));
+        app.type_space();
+    }
+
+    // The second run was slower, so the record still belongs to the first —
+    // and the history has both, which is the whole point of it.
+    assert!(!app.is_new_best());
+    let runs = history(&app, 30);
+    assert_eq!(runs.len(), 2);
+    assert!(runs[1] < runs[0]);
+}
+
+#[test]
+fn a_test_nobody_typed_is_not_in_the_history() {
+    let mut app = app(&["cat"]);
+    app.started_at = Some(Instant::now() - app.duration());
+    app.tick();
+
+    assert!(history(&app, 30).is_empty());
+}
+
+#[test]
+fn an_abandoned_test_is_not_in_the_history() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat ");
+    app.restart();
+
+    assert!(history(&app, 30).is_empty());
 }
 
 #[test]

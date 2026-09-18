@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::banner::Banner;
+use crate::history::History;
 use crate::misses::Misses;
 use crate::records::Records;
 use crate::settings::Settings;
@@ -97,6 +98,10 @@ pub struct App {
     /// Personal bests, loaded once at startup and written back on every
     /// completed test.
     records: Records,
+    /// Every run this install has finished, which is what the records screen
+    /// plots. Separate from `records` because a best is one number and a
+    /// history is all of them.
+    history: History,
     /// Whether the run just finished beat the record for its duration.
     new_best: bool,
 
@@ -141,6 +146,7 @@ impl App {
     pub fn new() -> Self {
         Self::build(
             Records::load(),
+            History::load(),
             Banner::load(),
             Settings::load(),
             Themes::load(),
@@ -156,6 +162,7 @@ impl App {
     fn detached() -> Self {
         Self::build(
             Records::default(),
+            History::default(),
             Banner::detached(),
             Settings::detached(),
             Themes::detached(),
@@ -163,7 +170,13 @@ impl App {
     }
 
     /// The single constructor both of those go through.
-    fn build(records: Records, banner: Banner, settings: Settings, themes: Themes) -> Self {
+    fn build(
+        records: Records,
+        history: History,
+        banner: Banner,
+        settings: Settings,
+        themes: Themes,
+    ) -> Self {
         // Only a length the menu can represent: an arbitrary number from a
         // hand-edited file would run a test the menu couldn't show you.
         let seconds = settings
@@ -179,6 +192,7 @@ impl App {
             menu_index: 0,
             duration: Duration::from_secs(seconds),
             records,
+            history,
             new_best: false,
             banner,
             status: None,
@@ -287,6 +301,12 @@ impl App {
 
     pub fn records(&self) -> &Records {
         &self.records
+    }
+
+    /// Every run this install has finished, for the graph on the records
+    /// screen.
+    pub fn history(&self) -> &History {
+        &self.history
     }
 
     /// The run just finished beat its record. False for an abandoned test.
@@ -487,9 +507,10 @@ impl App {
 
         // Nothing typed, or over too fast for an honest score: not a result.
         if let Some(wpm) = self.wpm().filter(|_| self.keystrokes > 0) {
-            self.new_best = self
-                .records
-                .submit(self.duration.as_secs(), wpm, self.accuracy());
+            let (seconds, accuracy) = (self.duration.as_secs(), self.accuracy());
+
+            self.new_best = self.records.submit(seconds, wpm, accuracy);
+            self.history.push(seconds, wpm, accuracy);
         }
     }
 
