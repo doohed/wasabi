@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::modifiers::Modifiers;
 use crate::storage;
 
 const FILE: &str = "settings.tsv";
 const THEME: &str = "theme";
 const DURATION: &str = "duration";
 const BANNER: &str = "banner";
+const PUNCTUATION: &str = "punctuation";
+const NUMBERS: &str = "numbers";
 
 /// Persisted preferences.
 ///
@@ -85,6 +88,35 @@ impl Settings {
         let value = if shown { "on" } else { "off" };
         self.values.insert(BANNER.to_string(), value.to_string());
         self.save();
+    }
+
+    /// What the test does to its words once they're dealt.
+    ///
+    /// Both default to off, and anything unrecognised reads as off: a typo in
+    /// a hand-edited file shouldn't quietly change what the test is.
+    pub fn modifiers(&self) -> Modifiers {
+        Modifiers {
+            punctuation: self.flag(PUNCTUATION),
+            numbers: self.flag(NUMBERS),
+        }
+    }
+
+    pub fn set_modifiers(&mut self, modifiers: Modifiers) {
+        self.set_flag(PUNCTUATION, modifiers.punctuation);
+        self.set_flag(NUMBERS, modifiers.numbers);
+        self.save();
+    }
+
+    fn flag(&self, key: &str) -> bool {
+        matches!(
+            self.values.get(key).map(String::as_str),
+            Some("on" | "true" | "yes" | "1")
+        )
+    }
+
+    fn set_flag(&mut self, key: &str, on: bool) {
+        let value = if on { "on" } else { "off" };
+        self.values.insert(key.to_string(), value.to_string());
     }
 
     /// Best-effort write, for the same reason as the records: losing a

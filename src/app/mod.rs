@@ -3,24 +3,19 @@ use std::time::{Duration, Instant};
 use crate::banner::Banner;
 use crate::history::History;
 use crate::misses::Misses;
+use crate::modifiers::Modifiers;
 use crate::records::Records;
 use crate::settings::Settings;
 use crate::theme::{Theme, Themes};
 use crate::timeline::{self, Timeline};
 use crate::word::{CharState, Word};
-use crate::wordlist;
+use crate::wordlist::Wordlist;
 
 /// Test lengths offered in the menu, in seconds.
 pub const DURATIONS: [u64; 3] = [15, 30, 60];
 
 /// The length a fresh install starts on.
 const DEFAULT_DURATION: u64 = 30;
-
-/// Words generated per second of test.
-///
-/// Five words a second is 300 wpm — comfortably faster than anyone types — so
-/// the timer is what ends a test, never the word list running dry.
-const WORDS_PER_SECOND: usize = 5;
 
 /// Which screen is in front.
 ///
@@ -30,6 +25,7 @@ const WORDS_PER_SECOND: usize = 5;
 pub enum Screen {
     Test,
     Menu,
+    Words,
     Banner,
     Theme,
     Records,
@@ -38,6 +34,7 @@ pub enum Screen {
 /// A file the user can open in `$EDITOR` from inside the app.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditTarget {
+    Words,
     Banner,
     Themes,
 }
@@ -47,6 +44,12 @@ pub enum EditTarget {
 pub enum MenuItem {
     /// Switch the test to this many seconds.
     Duration(u64),
+    /// Open the words screen, where the pool the test draws from is chosen.
+    Words,
+    /// Punctuate the words the test deals.
+    Punctuation,
+    /// Put the occasional number among them.
+    Numbers,
     /// Open the banner screen, where the art above the test is chosen.
     Banner,
     /// Open the theme picker.
@@ -56,10 +59,16 @@ pub enum MenuItem {
 }
 
 /// The menu, top to bottom.
-pub const MENU: [MenuItem; DURATIONS.len() + 3] = [
+///
+/// What the test is comes first — its length, its words, what is done to them
+/// — then how it looks, then how it went.
+pub const MENU: [MenuItem; DURATIONS.len() + 6] = [
     MenuItem::Duration(DURATIONS[0]),
     MenuItem::Duration(DURATIONS[1]),
     MenuItem::Duration(DURATIONS[2]),
+    MenuItem::Words,
+    MenuItem::Punctuation,
+    MenuItem::Numbers,
     MenuItem::Banner,
     MenuItem::Theme,
     MenuItem::Records,
@@ -105,6 +114,9 @@ pub struct App {
     /// Whether the run just finished beat the record for its duration.
     new_best: bool,
 
+    /// The pool the test draws its words from.
+    wordlist: Wordlist,
+
     /// The art drawn above the test.
     banner: Banner,
     /// A one-line message for the screen in front — the result of the last
@@ -147,6 +159,7 @@ impl App {
         Self::build(
             Records::load(),
             History::load(),
+            Wordlist::load(),
             Banner::load(),
             Settings::load(),
             Themes::load(),
@@ -163,6 +176,7 @@ impl App {
         Self::build(
             Records::default(),
             History::default(),
+            Wordlist::detached(),
             Banner::detached(),
             Settings::detached(),
             Themes::detached(),
@@ -173,6 +187,7 @@ impl App {
     fn build(
         records: Records,
         history: History,
+        wordlist: Wordlist,
         banner: Banner,
         settings: Settings,
         themes: Themes,
@@ -194,6 +209,7 @@ impl App {
             records,
             history,
             new_best: false,
+            wordlist,
             banner,
             status: None,
             edit_requested: None,
@@ -217,7 +233,9 @@ impl App {
     /// Everything chosen by the user — the duration, the screen, the records —
     /// survives; only the run itself is reset.
     pub fn restart(&mut self) {
-        self.words = wordlist::random(self.duration.as_secs() as usize * WORDS_PER_SECOND);
+        self.words = self
+            .wordlist
+            .deal(self.duration.as_secs(), self.modifiers());
         self.cursor_word = 0;
         self.started_at = None;
         self.ended_at = None;
@@ -254,7 +272,7 @@ impl App {
         self.status = None;
 
         self.screen = match self.screen {
-            Screen::Banner | Screen::Theme | Screen::Records => Screen::Menu,
+            Screen::Words | Screen::Banner | Screen::Theme | Screen::Records => Screen::Menu,
             Screen::Menu | Screen::Test => Screen::Test,
         };
     }
@@ -272,9 +290,28 @@ impl App {
                 self.set_duration(seconds);
                 self.screen = Screen::Test;
             }
+            MenuItem::Words => self.screen = Screen::Words,
+            MenuItem::Punctuation => self.toggle_punctuation(),
+            MenuItem::Numbers => self.toggle_numbers(),
             MenuItem::Banner => self.screen = Screen::Banner,
             MenuItem::Theme => self.screen = Screen::Theme,
             MenuItem::Records => self.screen = Screen::Records,
+        }
+    }
+
+    /// Whether the setting on this row is in force, for the menu's marker.
+    ///
+    /// A question per row rather than one highlighted index: the lengths are a
+    /// choice of one, and the modifiers are two independent switches, so there
+    /// is no single row that is "the" active one.
+    pub fn menu_ticked(&self, item: MenuItem) -> bool {
+        let modifiers = self.modifiers();
+
+        match item {
+            MenuItem::Duration(seconds) => seconds == self.duration.as_secs(),
+            MenuItem::Punctuation => modifiers.punctuation,
+            MenuItem::Numbers => modifiers.numbers,
+            MenuItem::Words | MenuItem::Banner | MenuItem::Theme | MenuItem::Records => false,
         }
     }
 
@@ -297,6 +334,39 @@ impl App {
 
     pub fn duration(&self) -> Duration {
         self.duration
+    }
+
+    /// What the test does to its words once they're dealt.
+    pub fn modifiers(&self) -> Modifiers {
+        self.settings.modifiers()
+    }
+
+    /// The name this run's records are filed under: its length, and what was
+    /// done to its words.
+    pub fn record_key(&self) -> String {
+        self.modifiers().key(self.duration.as_secs())
+    }
+
+    pub fn toggle_punctuation(&mut self) {
+        let mut modifiers = self.modifiers();
+        modifiers.punctuation = !modifiers.punctuation;
+        self.set_modifiers(modifiers);
+    }
+
+    pub fn toggle_numbers(&mut self) {
+        let mut modifiers = self.modifiers();
+        modifiers.numbers = !modifiers.numbers;
+        self.set_modifiers(modifiers);
+    }
+
+    /// Change what the test does to its words, and remember it for next time.
+    ///
+    /// Always restarts, for the same reason a change of length does: the words
+    /// on screen were dealt under the old setting, and finishing them would
+    /// score a test nobody chose.
+    fn set_modifiers(&mut self, modifiers: Modifiers) {
+        self.settings.set_modifiers(modifiers);
+        self.restart();
     }
 
     pub fn records(&self) -> &Records {
@@ -361,6 +431,37 @@ impl App {
             (_, 1) => format!("loaded {custom} of your themes — 1 line ignored"),
             (_, _) => format!("loaded {custom} of your themes — {skipped} lines ignored"),
         });
+    }
+
+    // -- words ------------------------------------------------------------
+
+    pub fn wordlist(&self) -> &Wordlist {
+        &self.wordlist
+    }
+
+    /// Re-read the word list, picking up anything just saved to it.
+    ///
+    /// Restarts, because the words on screen came from the old pool: leaving
+    /// them there would make `r` look like it had done nothing.
+    pub fn reload_wordlist(&mut self) {
+        self.wordlist = Wordlist::load();
+        self.restart();
+
+        self.status = Some(if self.wordlist.is_custom() {
+            format!("loaded your words — {} of them", self.wordlist.len())
+        } else {
+            "no words saved — using the built-in list".to_string()
+        });
+    }
+
+    /// Throw away the user's word list and go back to the built-in.
+    pub fn reset_wordlist(&mut self) {
+        self.status = Some(match self.wordlist.reset() {
+            Ok(()) => "removed your words — using the built-in list".to_string(),
+            Err(error) => format!("couldn't remove it: {error}"),
+        });
+
+        self.restart();
     }
 
     // -- banner -----------------------------------------------------------
@@ -507,10 +608,10 @@ impl App {
 
         // Nothing typed, or over too fast for an honest score: not a result.
         if let Some(wpm) = self.wpm().filter(|_| self.keystrokes > 0) {
-            let (seconds, accuracy) = (self.duration.as_secs(), self.accuracy());
+            let (key, accuracy) = (self.record_key(), self.accuracy());
 
-            self.new_best = self.records.submit(seconds, wpm, accuracy);
-            self.history.push(seconds, wpm, accuracy);
+            self.new_best = self.records.submit(&key, wpm, accuracy);
+            self.history.push(&key, wpm, accuracy);
         }
     }
 

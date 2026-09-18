@@ -28,13 +28,13 @@ pub const WINDOW: usize = 10;
 /// The same four figures [`crate::records::Records::submit`] is given, because
 /// the two are filed from the same place about the same run — a history that
 /// could disagree with the records would be worse than no history.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Run {
     /// Unix seconds. Stored absolute so the file doesn't rot between sessions.
     pub at: u64,
-    /// Test length in seconds — runs at different lengths aren't comparable,
-    /// so nothing plots them together.
-    pub duration: u64,
+    /// What the test was: its length, and what was done to its words. Runs at
+    /// different settings aren't comparable, so nothing plots them together.
+    pub key: String,
     pub wpm: f64,
     pub accuracy: f64,
 }
@@ -69,28 +69,27 @@ impl History {
     }
 
     /// File a completed run, in memory and on disk.
-    pub fn push(&mut self, duration: u64, wpm: f64, accuracy: f64) {
+    pub fn push(&mut self, key: &str, wpm: f64, accuracy: f64) {
         let run = Run {
             at: unix_now(),
-            duration,
+            key: key.to_string(),
             wpm,
             accuracy,
         };
 
+        self.append(&run);
         self.runs.push(run);
-        self.append(run);
     }
 
-    /// Every run at one test length, oldest first.
+    /// Every run at one setting, oldest first.
     ///
     /// Owned, because the caller plots them and a `Dataset` borrows its points
-    /// for as long as it lives; a `Run` is four numbers, so this is cheaper
-    /// than the lifetime it would save.
-    pub fn at(&self, duration: u64) -> Vec<Run> {
+    /// for as long as it lives.
+    pub fn at(&self, key: &str) -> Vec<Run> {
         self.runs
             .iter()
-            .copied()
-            .filter(|run| run.duration == duration)
+            .filter(|run| run.key == key)
+            .cloned()
             .collect()
     }
 
@@ -100,7 +99,7 @@ impl History {
     /// there is no reason to put the whole of it back at the end of every
     /// test. Best-effort, like every other write here — losing a line of
     /// history is not worth interrupting a typing session over.
-    fn append(&self, run: Run) {
+    fn append(&self, run: &Run) {
         let Some(path) = &self.path else {
             return; // in-memory instance
         };
@@ -149,11 +148,11 @@ fn history_path() -> Option<PathBuf> {
     Some(crate::storage::data_dir()?.join(FILE))
 }
 
-/// One tab-separated line per run: `at duration wpm accuracy`.
-fn format(run: Run) -> String {
+/// One tab-separated line per run: `at key wpm accuracy`.
+fn format(run: &Run) -> String {
     format!(
         "{}\t{}\t{:.2}\t{:.2}\n",
-        run.at, run.duration, run.wpm, run.accuracy
+        run.at, run.key, run.wpm, run.accuracy
     )
 }
 
@@ -169,13 +168,16 @@ fn parse(text: &str) -> Vec<Run> {
         .filter_map(|line| {
             let mut fields = line.split('\t');
             let at = fields.next()?.parse().ok()?;
-            let duration = fields.next()?.parse().ok()?;
+            // The key is whatever names the test, so nothing is parsed out of
+            // it — a run recorded at a setting this version has never heard of
+            // still reads, and simply never matches anything.
+            let key = fields.next().filter(|key| !key.is_empty())?.to_string();
             let wpm = fields.next()?.parse().ok()?;
             let accuracy = fields.next()?.parse().ok()?;
 
             Some(Run {
                 at,
-                duration,
+                key,
                 wpm,
                 accuracy,
             })
@@ -187,13 +189,13 @@ fn parse(text: &str) -> Vec<Run> {
 mod tests {
     use super::*;
 
-    /// Runs at one length, at the given speeds, oldest first.
-    fn runs(duration: u64, speeds: &[f64]) -> Vec<Run> {
+    /// Runs at one setting, at the given speeds, oldest first.
+    fn runs(key: &str, speeds: &[f64]) -> Vec<Run> {
         speeds
             .iter()
             .map(|wpm| Run {
                 at: 1_700_000_000,
-                duration,
+                key: key.to_string(),
                 wpm: *wpm,
                 accuracy: 97.0,
             })
@@ -207,36 +209,40 @@ mod tests {
     #[test]
     fn a_pushed_run_reads_back() {
         let mut history = History::default();
-        history.push(30, 82.0, 97.0);
+        history.push("30", 82.0, 97.0);
 
-        let runs = history.at(30);
+        let runs = history.at("30");
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].wpm, 82.0);
     }
 
     #[test]
-    fn durations_are_kept_apart() {
+    fn settings_are_kept_apart() {
         let mut history = History::default();
-        history.push(15, 90.0, 95.0);
-        history.push(30, 80.0, 96.0);
-        history.push(15, 91.0, 94.0);
+        history.push("15", 90.0, 95.0);
+        history.push("30", 80.0, 96.0);
+        history.push("15", 91.0, 94.0);
+        history.push("30+p", 70.0, 93.0);
 
-        assert_eq!(history.at(15).len(), 2);
-        assert_eq!(history.at(30).len(), 1);
-        assert!(history.at(60).is_empty());
+        assert_eq!(history.at("15").len(), 2);
+        // A punctuated run is a different test, and doesn't join the plain
+        // one's line.
+        assert_eq!(history.at("30").len(), 1);
+        assert_eq!(history.at("30+p").len(), 1);
+        assert!(history.at("60").is_empty());
     }
 
     #[test]
     fn runs_come_back_oldest_first() {
-        let history = history(runs(30, &[10.0, 20.0, 30.0]));
-        let speeds: Vec<f64> = history.at(30).iter().map(|run| run.wpm).collect();
+        let history = history(runs("30", &[10.0, 20.0, 30.0]));
+        let speeds: Vec<f64> = history.at("30").iter().map(|run| run.wpm).collect();
 
         assert_eq!(speeds, vec![10.0, 20.0, 30.0]);
     }
 
     #[test]
     fn a_trend_averages_the_window_behind_each_run() {
-        let runs = runs(30, &[10.0, 20.0, 30.0, 40.0]);
+        let runs = runs("30", &[10.0, 20.0, 30.0, 40.0]);
 
         // Window of two: each value is this run and the one before it.
         assert_eq!(trend(&runs, 2), vec![10.0, 15.0, 25.0, 35.0]);
@@ -244,7 +250,7 @@ mod tests {
 
     #[test]
     fn a_trend_starts_before_the_window_is_full() {
-        let runs = runs(30, &[10.0, 20.0]);
+        let runs = runs("30", &[10.0, 20.0]);
 
         // Averaged over what there is, rather than starting ten runs in.
         assert_eq!(trend(&runs, WINDOW), vec![10.0, 15.0]);
@@ -257,18 +263,18 @@ mod tests {
 
     #[test]
     fn a_zero_window_still_averages_one_run() {
-        let runs = runs(30, &[10.0, 20.0]);
+        let runs = runs("30", &[10.0, 20.0]);
         assert_eq!(trend(&runs, 0), vec![10.0, 20.0]);
     }
 
     #[test]
     fn the_best_run_is_the_fastest_one() {
-        assert_eq!(best(&runs(30, &[10.0, 40.0, 30.0])), Some(1));
+        assert_eq!(best(&runs("30", &[10.0, 40.0, 30.0])), Some(1));
     }
 
     #[test]
     fn equal_bests_belong_to_the_run_that_set_it() {
-        assert_eq!(best(&runs(30, &[40.0, 20.0, 40.0])), Some(0));
+        assert_eq!(best(&runs("30", &[40.0, 20.0, 40.0])), Some(0));
     }
 
     #[test]
@@ -280,12 +286,12 @@ mod tests {
     fn a_written_line_reads_back_identically() {
         let run = Run {
             at: 1_700_000_000,
-            duration: 30,
+            key: "30+p".to_string(),
             wpm: 82.5,
             accuracy: 97.25,
         };
 
-        assert_eq!(parse(&format(run)), vec![run]);
+        assert_eq!(parse(&format(&run)), vec![run]);
     }
 
     #[test]
@@ -301,7 +307,7 @@ not a run
 
         assert_eq!(runs.len(), 2);
         assert_eq!(runs[0].wpm, 82.5);
-        assert_eq!(runs[1].duration, 15);
+        assert_eq!(runs[1].key, "15");
     }
 
     #[test]
@@ -320,7 +326,7 @@ not a run
     #[test]
     fn an_in_memory_history_never_touches_the_disk() {
         let mut history = History::default();
-        history.push(30, 80.0, 99.0);
+        history.push("30", 80.0, 99.0);
 
         assert!(history.path.is_none());
     }

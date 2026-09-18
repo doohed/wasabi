@@ -21,13 +21,19 @@ pub struct Entry {
     pub runs: usize,
 }
 
-/// Personal bests, keyed by test duration in seconds.
+/// Personal bests, keyed by what the test was.
+///
+/// A `String` rather than a number of seconds, because the length stopped
+/// being the only thing that makes two tests different: see
+/// [`crate::modifiers::Modifiers::key`]. A plain test's key is the bare
+/// number, which is exactly what every records file written before that
+/// existed already holds.
 ///
 /// `path` is `None` for an in-memory instance, which makes [`Records::save`] a
 /// no-op — that is what keeps tests off the user's real records file.
 #[derive(Debug, Clone, Default)]
 pub struct Records {
-    entries: BTreeMap<u64, Entry>,
+    entries: BTreeMap<String, Entry>,
     path: Option<PathBuf>,
 }
 
@@ -50,19 +56,17 @@ impl Records {
         }
     }
 
-    pub fn best(&self, seconds: u64) -> Option<&Best> {
-        self.entries
-            .get(&seconds)
-            .and_then(|entry| entry.best.as_ref())
+    pub fn best(&self, key: &str) -> Option<&Best> {
+        self.entries.get(key).and_then(|entry| entry.best.as_ref())
     }
 
-    pub fn runs(&self, seconds: u64) -> usize {
-        self.entries.get(&seconds).map_or(0, |entry| entry.runs)
+    pub fn runs(&self, key: &str) -> usize {
+        self.entries.get(key).map_or(0, |entry| entry.runs)
     }
 
     /// File a completed run. Returns whether it was a personal best.
-    pub fn submit(&mut self, seconds: u64, wpm: f64, accuracy: f64) -> bool {
-        let entry = self.entries.entry(seconds).or_default();
+    pub fn submit(&mut self, key: &str, wpm: f64, accuracy: f64) -> bool {
+        let entry = self.entries.entry(key.to_string()).or_default();
         entry.runs += 1;
 
         let improved = entry.best.as_ref().is_none_or(|best| wpm > best.wpm);
@@ -106,20 +110,20 @@ pub fn unix_now() -> u64 {
         .map_or(0, |since| since.as_secs())
 }
 
-/// One tab-separated line per duration: `seconds wpm accuracy at runs`.
+/// One tab-separated line per test: `key wpm accuracy at runs`.
 ///
 /// Hand-rolled rather than JSON because it is five numbers: a serialisation
 /// dependency would outweigh the format.
-fn format(entries: &BTreeMap<u64, Entry>) -> String {
+fn format(entries: &BTreeMap<String, Entry>) -> String {
     let mut out = String::new();
 
-    for (seconds, entry) in entries {
+    for (key, entry) in entries {
         let Some(best) = &entry.best else {
             continue; // nothing worth writing down
         };
         out.push_str(&format!(
             "{}\t{:.2}\t{:.2}\t{}\t{}\n",
-            seconds, best.wpm, best.accuracy, best.at, entry.runs
+            key, best.wpm, best.accuracy, best.at, entry.runs
         ));
     }
 
@@ -130,17 +134,19 @@ fn format(entries: &BTreeMap<u64, Entry>) -> String {
 ///
 /// Tolerant on purpose: a half-written line from a crash costs you one score,
 /// not the whole file.
-fn parse(text: &str) -> BTreeMap<u64, Entry> {
+fn parse(text: &str) -> BTreeMap<String, Entry> {
     let mut entries = BTreeMap::new();
 
     for line in text.lines() {
         let fields: Vec<&str> = line.split('\t').collect();
-        let [seconds, wpm, accuracy, at, runs] = fields[..] else {
+        let [key, wpm, accuracy, at, runs] = fields[..] else {
             continue;
         };
 
-        let (Ok(seconds), Ok(wpm), Ok(accuracy), Ok(at), Ok(runs)) = (
-            seconds.parse::<u64>(),
+        // The key is whatever names the test, so nothing is parsed out of it
+        // — a file from a later version naming a setting this one has never
+        // heard of still reads, and simply never matches anything.
+        let (Ok(wpm), Ok(accuracy), Ok(at), Ok(runs)) = (
             wpm.parse::<f64>(),
             accuracy.parse::<f64>(),
             at.parse::<u64>(),
@@ -149,8 +155,12 @@ fn parse(text: &str) -> BTreeMap<u64, Entry> {
             continue;
         };
 
+        if key.is_empty() {
+            continue;
+        }
+
         entries.insert(
-            seconds,
+            key.to_string(),
             Entry {
                 best: Some(Best { wpm, accuracy, at }),
                 runs,
@@ -184,56 +194,56 @@ mod tests {
     #[test]
     fn a_first_run_is_always_a_personal_best() {
         let mut records = Records::default();
-        assert!(records.submit(30, 0.0, 100.0));
-        assert_eq!(records.runs(30), 1);
+        assert!(records.submit("30", 0.0, 100.0));
+        assert_eq!(records.runs("30"), 1);
     }
 
     #[test]
     fn only_a_faster_run_replaces_the_best() {
         let mut records = Records::default();
-        records.submit(30, 60.0, 95.0);
+        records.submit("30", 60.0, 95.0);
 
-        assert!(!records.submit(30, 50.0, 100.0));
-        assert_eq!(records.best(30).unwrap().wpm, 60.0);
+        assert!(!records.submit("30", 50.0, 100.0));
+        assert_eq!(records.best("30").unwrap().wpm, 60.0);
 
-        assert!(records.submit(30, 70.0, 90.0));
-        assert_eq!(records.best(30).unwrap().wpm, 70.0);
+        assert!(records.submit("30", 70.0, 90.0));
+        assert_eq!(records.best("30").unwrap().wpm, 70.0);
     }
 
     #[test]
     fn every_run_counts_towards_the_total() {
         let mut records = Records::default();
         for wpm in [60.0, 50.0, 70.0] {
-            records.submit(30, wpm, 95.0);
+            records.submit("30", wpm, 95.0);
         }
 
-        assert_eq!(records.runs(30), 3);
+        assert_eq!(records.runs("30"), 3);
     }
 
     #[test]
-    fn durations_are_scored_separately() {
+    fn settings_are_scored_separately() {
         let mut records = Records::default();
-        records.submit(15, 90.0, 95.0);
-        records.submit(60, 40.0, 99.0);
+        records.submit("15", 90.0, 95.0);
+        records.submit("60", 40.0, 99.0);
 
-        assert_eq!(records.best(15).unwrap().wpm, 90.0);
-        assert_eq!(records.best(60).unwrap().wpm, 40.0);
-        assert_eq!(records.best(30), None);
-        assert_eq!(records.runs(30), 0);
+        assert_eq!(records.best("15").unwrap().wpm, 90.0);
+        assert_eq!(records.best("60").unwrap().wpm, 40.0);
+        assert_eq!(records.best("30"), None);
+        assert_eq!(records.runs("30"), 0);
     }
 
     #[test]
     fn an_unseen_duration_has_no_record() {
         let records = Records::default();
-        assert_eq!(records.best(30), None);
-        assert_eq!(records.runs(30), 0);
+        assert_eq!(records.best("30"), None);
+        assert_eq!(records.runs("30"), 0);
     }
 
     #[test]
     fn a_saved_file_reads_back_identically() {
         let mut entries = BTreeMap::new();
         entries.insert(
-            30,
+            "30".to_string(),
             Entry {
                 best: Some(Best {
                     wpm: 82.5,
@@ -250,7 +260,7 @@ mod tests {
     #[test]
     fn a_duration_never_completed_is_not_written() {
         let mut entries = BTreeMap::new();
-        entries.insert(30, Entry::default());
+        entries.insert("30".to_string(), Entry::default());
 
         assert_eq!(format(&entries), "");
     }
@@ -262,11 +272,12 @@ not a record
 30\t82.50\t97.00\t1700000000\t12
 15\tbroken\t97.00\t1700000000\t3
 60\t70.00\t99.00\t1700000000
+\t70.00\t99.00\t1700000000\t4
 ";
         let entries = parse(text);
 
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[&30].runs, 12);
+        assert_eq!(entries["30"].runs, 12);
     }
 
     #[test]
@@ -277,7 +288,7 @@ not a record
     #[test]
     fn an_in_memory_records_never_touches_the_disk() {
         let mut records = Records::default();
-        records.submit(30, 80.0, 99.0);
+        records.submit("30", 80.0, 99.0);
 
         assert!(records.path.is_none());
     }

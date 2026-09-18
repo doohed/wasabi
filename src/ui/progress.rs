@@ -34,11 +34,12 @@ const TOO_FEW: &str = "not enough runs at this length yet";
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
     let seconds = app.duration().as_secs();
+    let key = app.record_key();
 
     let [plot_area, caption_area] =
         Layout::vertical([Constraint::Fill(1), Constraint::Length(CAPTION_HEIGHT)]).areas(area);
 
-    let all = app.history().at(seconds);
+    let all = app.history().at(&key);
     // Kept as an offset rather than dropped, so the axis can still say which
     // runs these are out of everything you've typed.
     let first = all.len().saturating_sub(SHOWN);
@@ -177,7 +178,7 @@ fn caption(seconds: u64, theme: &Theme) -> Paragraph<'static> {
 /// Whether there is a plot to draw at all, so the panel can leave the room out
 /// rather than heading a blank space.
 pub fn has_plot(app: &App) -> bool {
-    app.history().at(app.duration().as_secs()).len() >= MIN_RUNS
+    app.history().at(&app.record_key()).len() >= MIN_RUNS
 }
 
 #[cfg(test)]
@@ -194,7 +195,7 @@ mod tests {
         (0..count)
             .map(|index| Run {
                 at: 1_700_000_000,
-                duration: 30,
+                key: "30".to_string(),
                 wpm: 50.0 + index as f64,
                 accuracy: 97.0,
             })

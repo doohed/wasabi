@@ -38,7 +38,9 @@ while typing — `q` types a `q`. That leaves Esc, Tab, and modifiers.
 | `esc` | open the menu |
 | `ctrl-c` | quit |
 
-In the menu, `↑↓` (or `j`/`k`) moves, `enter` selects, `esc` goes back.
+In the menu, `↑↓` (or `j`/`k`) moves, `enter` selects, `esc` goes back. A `✓`
+marks a setting that's in force — there can be several, since the modifiers are
+switches rather than a choice of one.
 
 ## What it measures
 
@@ -116,6 +118,50 @@ Press `esc`, then pick a row.
 15, 30 or 60 seconds, remembered between sessions. Changing it always restarts
 — a half-typed test measured against a different clock would be meaningless.
 
+### Words
+
+The pool the test draws from is yours to replace, the same way the art is.
+
+| key | |
+|---|---|
+| `e` | open it in `$EDITOR`, seeded with the built-in list |
+| `r` | reload it from disk |
+| `x` | remove it and go back to the built-in |
+
+Words are read from `words.txt` (see [Files](#files)). One word per line, or
+several to a line — the file is split on whitespace, so a list and a paragraph
+of prose are both valid. Lines starting with `#` are comments, which is what
+lets the seeded file explain itself; the cost is words beginning with `#`, and
+a typing test is a fair place to spend those.
+
+Words are drawn at random *with* repetition, so a pool shorter than the test is
+fine — a ten-word list just repeats a lot, and the screen says so rather than
+refusing it. A file with no words in it reads as absent, so emptying the file
+gets you the built-in list back rather than a test with nothing to type.
+
+The built-in list is the 200 most common English words, which is what
+MonkeyType's default test draws from: short and overwhelmingly ASCII, so lines
+wrap predictably and the test measures typing rather than reading.
+
+### Punctuation and numbers
+
+Two switches in the menu, each with a `✓` when it's on.
+
+**Punctuation** attaches marks to about one word in four — mostly commas and
+full stops, sometimes a colon or semicolon, occasionally a pair of quotes or
+brackets — and capitalises the first word of every sentence, looking past a
+closing quote so `end."` still ends one.
+
+**Numbers** replaces about one word in eight with a number of up to four
+digits. Never the first word: a test that opens on a bare number reads as a
+rendering fault rather than a setting you turned on.
+
+Both are transforms over the words after they're dealt, not word lists of their
+own — which is what lets them apply to *your* pool. Turn punctuation on over a
+Spanish list and you get punctuated Spanish, with nothing shipped to make that
+work. Changing either always restarts, for the same reason changing the length
+does: the words on screen were dealt under the old setting.
+
 ### Records
 
 A personal best per test length, kept between sessions.
@@ -126,16 +172,23 @@ The accuracy shown is *that run's*, not your best ever — a personal best is on
 result, and splitting it across runs would flatter you. Abandoned runs aren't
 recorded.
 
+Each combination of length and modifiers keeps its own record, and the heading
+says which one you're looking at. A punctuated test is a different test — the
+same argument the length makes — so it doesn't have to compete with the plain
+one and lose. Swapping your word list doesn't split them, though: the app can't
+tell a new list from an edited one, so what you practise on is on you.
+
 Under the table is every run you've finished at the length the test is
 currently set to, oldest on the left. The quiet line is the runs themselves and
 the accented one is a ten-run trailing average — the same pairing as the
 results graph, where the jagged line is the moment and the smooth one is what
 it adds up to. The dot marks your best.
 
-One length rather than all three, because a 15s run and a 60s run are different
-tests: plotting them on one line would put a step in it every time you changed
-the setting and call that improvement. Change the length in the menu and the
-plot follows. The last fifty runs are shown — a line squeezing a thousand runs
+One setting rather than all of them, because a 15s run and a 60s run are
+different tests, and so are a plain one and a punctuated one: plotting them on
+one line would put a step in it every time you changed the setting and call
+that improvement. Change the length or the modifiers in the menu and the plot
+follows. The last fifty runs are shown — a line squeezing a thousand runs
 into forty columns is a texture, not a trend — but the axis numbers them by
 where they sit in your whole history, so it agrees with the `runs` column above.
 
@@ -229,8 +282,9 @@ Things you write live in `$XDG_CONFIG_HOME/wasabi`, falling back to
 
 | file | |
 |---|---|
-| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner on/off |
+| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner and modifiers on/off |
 | `banner.txt` | your ASCII art, absent until you make one |
+| `words.txt` | your word list, absent until you make one |
 | `themes.conf` | your own palettes, absent until you press `e` in the picker |
 
 Things the app writes live in `$XDG_DATA_HOME/wasabi`, falling back to
@@ -250,7 +304,7 @@ bests is losing history, losing a setting is not, so the two deserve different
 backup habits. Versions before this kept everything in the data directory —
 those files are moved into place automatically on first run.
 
-All three are plain text and safe to edit or delete by hand. Reading them is
+All four are plain text and safe to edit or delete by hand. Reading them is
 infallible by design: a missing, unreadable or corrupt file means "no records
 yet" or "default settings", never a failure to start. Refusing to open a typing
 test because a scoreboard wouldn't parse would be the wrong trade.
@@ -263,7 +317,8 @@ src/
 ├── tui.rs         terminal setup, event loop, key routing
 ├── app/           all application state — no ratatui types anywhere
 ├── word.rs        one word: its target, what was typed, per-character state
-├── wordlist.rs    the word pool
+├── wordlist.rs    the word pool, and its file
+├── modifiers.rs   what the test does to the words once they're dealt
 ├── records.rs     personal bests, and their file
 ├── history.rs     every finished run, and their file
 ├── timeline.rs    a reading a second, and the figures derived from them
@@ -282,6 +337,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 203 tests, no terminal required
+cargo test     # 233 tests, no terminal required
 cargo clippy --all-targets
 ```

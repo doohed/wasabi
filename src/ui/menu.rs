@@ -14,6 +14,9 @@ pub const HEIGHT: u16 = MENU.len() as u16 + 3;
 fn label(item: MenuItem) -> String {
     match item {
         MenuItem::Duration(seconds) => format!("{seconds} seconds"),
+        MenuItem::Words => "words".to_string(),
+        MenuItem::Punctuation => "punctuation".to_string(),
+        MenuItem::Numbers => "numbers".to_string(),
         MenuItem::Banner => "banner".to_string(),
         MenuItem::Theme => "theme".to_string(),
         MenuItem::Records => "records".to_string(),
@@ -23,7 +26,6 @@ fn label(item: MenuItem) -> String {
 /// The settings menu: test length, and a way into the records table.
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
-    let active = app.duration_index();
 
     let rows: Vec<Line> = MENU
         .iter()
@@ -36,9 +38,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 style = style.add_modifier(Modifier::REVERSED);
             }
 
-            // The tick marks the setting in force, which is not necessarily
-            // the row under the cursor.
-            let tick = if index == active { " ✓" } else { "" };
+            // The tick marks a setting in force, which is not necessarily the
+            // row under the cursor — and there can be several, because the
+            // modifiers are switches rather than a choice of one.
+            let tick = if app.menu_ticked(*item) { " ✓" } else { "" };
 
             Line::from(vec![
                 Span::raw(if highlighted { " › " } else { "   " }),

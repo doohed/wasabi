@@ -2,6 +2,7 @@ mod app;
 mod banner;
 mod history;
 mod misses;
+mod modifiers;
 mod records;
 mod settings;
 mod storage;

@@ -395,7 +395,7 @@ fn opening_the_menu_abandons_a_run_in_progress() {
 
     assert!(!app.is_running());
     assert_eq!(caret(&app), (0, 0));
-    assert_eq!(app.records().runs(30), 0);
+    assert_eq!(app.records().runs("30"), 0);
 }
 
 #[test]
@@ -437,7 +437,7 @@ fn choosing_a_duration_restarts_the_test() {
     assert_eq!(app.screen, Screen::Test);
     assert_eq!(caret(&app), (0, 0));
     // A fresh word list, sized for the new clock.
-    assert_eq!(app.words.len(), 15 * WORDS_PER_SECOND);
+    assert_eq!(app.words.len(), 15 * crate::wordlist::WORDS_PER_SECOND);
 }
 
 #[test]
@@ -450,6 +450,108 @@ fn choosing_a_duration_remembers_it_for_next_time() {
     assert_eq!(app.settings.duration(), Some(15));
 }
 
+// -- modifiers --------------------------------------------------------
+
+/// Turn a modifier on or off through the menu, as a user would.
+fn toggle(app: &mut App, item: MenuItem) {
+    app.open_menu();
+    app.menu_index = menu_row(item);
+    app.menu_select();
+}
+
+#[test]
+fn a_modifier_toggles_from_the_menu_and_is_remembered() {
+    let mut app = app(&["cat"]);
+    assert_eq!(app.modifiers(), Modifiers::default());
+
+    toggle(&mut app, MenuItem::Punctuation);
+    assert!(app.modifiers().punctuation);
+    assert!(!app.modifiers().numbers);
+    assert!(app.settings.modifiers().punctuation);
+
+    toggle(&mut app, MenuItem::Punctuation);
+    assert!(!app.modifiers().punctuation);
+}
+
+#[test]
+fn toggling_a_modifier_stays_in_the_menu() {
+    let mut app = app(&["cat"]);
+    toggle(&mut app, MenuItem::Numbers);
+
+    // Unlike a duration, which closes the menu: the two modifiers are
+    // switches, and you may well want to flip both.
+    assert_eq!(app.screen, Screen::Menu);
+    assert!(app.modifiers().numbers);
+}
+
+#[test]
+fn toggling_a_modifier_deals_a_fresh_test() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat ");
+    toggle(&mut app, MenuItem::Punctuation);
+
+    // The words on screen were dealt under the old setting, so finishing them
+    // would score a test nobody chose.
+    assert_eq!(caret(&app), (0, 0));
+    assert!(!app.is_running());
+}
+
+#[test]
+fn the_menu_ticks_every_setting_in_force() {
+    let mut app = app(&["cat"]);
+    toggle(&mut app, MenuItem::Punctuation);
+
+    assert!(app.menu_ticked(MenuItem::Duration(30)));
+    assert!(!app.menu_ticked(MenuItem::Duration(15)));
+    assert!(app.menu_ticked(MenuItem::Punctuation));
+    assert!(!app.menu_ticked(MenuItem::Numbers));
+    // Rows that open a screen aren't settings, so nothing is in force.
+    assert!(!app.menu_ticked(MenuItem::Words));
+}
+
+#[test]
+fn a_modified_run_is_filed_under_its_own_name() {
+    let mut app = app(&["cat", "dog"]);
+    toggle(&mut app, MenuItem::Punctuation);
+    assert_eq!(app.record_key(), "30+p");
+
+    app.words = ["cat", "dog"].into_iter().map(Word::new).collect();
+    app.screen = Screen::Test;
+    type_str(&mut app, "cat dog");
+    app.started_at = Some(Instant::now() - Duration::from_secs(5));
+    app.type_space();
+
+    // A punctuated test is a different test, so the plain 30s record is
+    // untouched and doesn't have to compete with it.
+    assert_eq!(app.records().runs("30+p"), 1);
+    assert_eq!(app.records().runs("30"), 0);
+    assert_eq!(history(&app, "30+p").len(), 1);
+    assert!(history(&app, "30").is_empty());
+}
+
+// -- words ------------------------------------------------------------
+
+#[test]
+fn the_words_screen_opens_from_the_menu_and_steps_back_to_it() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Words);
+    app.menu_select();
+
+    assert_eq!(app.screen, Screen::Words);
+
+    app.back();
+    assert_eq!(app.screen, Screen::Menu);
+}
+
+#[test]
+fn a_fresh_install_types_the_built_in_words() {
+    let app = app(&["cat"]);
+
+    assert!(!app.wordlist().is_custom());
+    assert_eq!(app.wordlist().len(), 200);
+}
+
 #[test]
 fn a_stored_duration_is_used_at_startup() {
     let mut settings = Settings::detached();
@@ -457,6 +559,7 @@ fn a_stored_duration_is_used_at_startup() {
     let app = App::build(
         Records::default(),
         History::default(),
+        Wordlist::detached(),
         Banner::detached(),
         settings,
         Themes::detached(),
@@ -475,6 +578,7 @@ fn a_duration_the_menu_cant_show_falls_back_to_the_default() {
     let app = App::build(
         Records::default(),
         History::default(),
+        Wordlist::detached(),
         Banner::detached(),
         settings,
         Themes::detached(),
@@ -670,7 +774,7 @@ fn finishing_a_test_files_a_record() {
     app.type_space();
 
     assert!(app.is_over());
-    assert_eq!(app.records().runs(30), 1);
+    assert_eq!(app.records().runs("30"), 1);
     assert!(app.is_new_best());
 }
 
@@ -681,7 +785,7 @@ fn a_test_nobody_typed_is_not_a_record() {
     app.tick();
 
     assert!(app.is_over());
-    assert_eq!(app.records().runs(30), 0);
+    assert_eq!(app.records().runs("30"), 0);
     assert!(!app.is_new_best());
 }
 
@@ -691,18 +795,14 @@ fn an_abandoned_test_is_not_a_record() {
     type_str(&mut app, "cat ");
     app.restart();
 
-    assert_eq!(app.records().runs(30), 0);
+    assert_eq!(app.records().runs("30"), 0);
 }
 
 // -- history ----------------------------------------------------------
 
 /// The speeds of every run filed at `seconds`, oldest first.
-fn history(app: &App, seconds: u64) -> Vec<f64> {
-    app.history()
-        .at(seconds)
-        .iter()
-        .map(|run| run.wpm)
-        .collect()
+fn history(app: &App, key: &str) -> Vec<f64> {
+    app.history().at(key).iter().map(|run| run.wpm).collect()
 }
 
 #[test]
@@ -714,7 +814,7 @@ fn a_finished_run_is_filed_in_the_history_too() {
 
     // The same figure the records were given, not a second reading of a
     // clock that has moved on since.
-    assert_eq!(history(&app, 30), vec![app.wpm().unwrap()]);
+    assert_eq!(history(&app, "30"), vec![app.wpm().unwrap()]);
 }
 
 #[test]
@@ -732,7 +832,7 @@ fn the_history_keeps_the_runs_that_weren_t_bests() {
     // The second run was slower, so the record still belongs to the first —
     // and the history has both, which is the whole point of it.
     assert!(!app.is_new_best());
-    let runs = history(&app, 30);
+    let runs = history(&app, "30");
     assert_eq!(runs.len(), 2);
     assert!(runs[1] < runs[0]);
 }
@@ -743,7 +843,7 @@ fn a_test_nobody_typed_is_not_in_the_history() {
     app.started_at = Some(Instant::now() - app.duration());
     app.tick();
 
-    assert!(history(&app, 30).is_empty());
+    assert!(history(&app, "30").is_empty());
 }
 
 #[test]
@@ -752,7 +852,7 @@ fn an_abandoned_test_is_not_in_the_history() {
     type_str(&mut app, "cat ");
     app.restart();
 
-    assert!(history(&app, 30).is_empty());
+    assert!(history(&app, "30").is_empty());
 }
 
 #[test]
@@ -771,7 +871,7 @@ fn a_slower_run_doesnt_clear_the_new_best_flag_of_its_own_run() {
     app.type_space();
 
     assert!(!app.is_new_best());
-    assert_eq!(app.records().runs(30), 2);
+    assert_eq!(app.records().runs("30"), 2);
 }
 
 #[test]

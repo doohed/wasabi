@@ -66,10 +66,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         Line::from(""),
     ];
 
-    for seconds in DURATIONS {
-        let runs = records.runs(seconds);
+    // Every length, at the modifiers in force: the table is about how long
+    // you type for, and the panel's heading says what the test was.
+    let modifiers = app.modifiers();
 
-        let line = match records.best(seconds) {
+    for seconds in DURATIONS {
+        let key = modifiers.key(seconds);
+        let runs = records.runs(&key);
+
+        let line = match records.best(&key) {
             Some(best) => Line::from(Span::styled(
                 row(
                     &format!("{seconds}s"),
@@ -90,7 +95,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         lines.push(line);
     }
 
-    let table = Paragraph::new(lines).block(super::panel(" records ", theme));
+    let title = match modifiers.label() {
+        Some(label) => format!(" records · {label} "),
+        None => " records ".to_string(),
+    };
+
+    let table = Paragraph::new(lines).block(super::panel(title, theme));
 
     // The same question `size` answered, asked of the area it actually got.
     if area.height < HEIGHT || !progress::has_plot(app) {

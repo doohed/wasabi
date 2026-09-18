@@ -62,6 +62,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     match app.screen {
         Screen::Test => test_key(app, key, ctrl),
         Screen::Menu => menu_key(app, key),
+        Screen::Words => words_key(app, key),
         Screen::Banner => banner_key(app, key),
         Screen::Theme => theme_key(app, key),
         Screen::Records => {
@@ -97,6 +98,17 @@ fn menu_key(app: &mut App, key: KeyEvent) {
         KeyCode::Up | KeyCode::Char('k') => app.menu_move(-1),
         KeyCode::Down | KeyCode::Char('j') => app.menu_move(1),
         KeyCode::Enter | KeyCode::Char(' ') => app.menu_select(),
+        _ => {}
+    }
+}
+
+/// Keys on the words screen.
+fn words_key(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc => app.back(),
+        KeyCode::Char('e') => app.request_edit(EditTarget::Words),
+        KeyCode::Char('r') => app.reload_wordlist(),
+        KeyCode::Char('x') => app.reset_wordlist(),
         _ => {}
     }
 }
@@ -148,6 +160,7 @@ fn edit_file(
     };
 
     let seeded = match target {
+        EditTarget::Words => app.wordlist().seed(),
         EditTarget::Banner => app.banner().seed(),
         EditTarget::Themes => app.themes().seed(),
     };
@@ -182,6 +195,7 @@ fn run_editor(
 
     match status {
         Ok(status) if status.success() => match target {
+            EditTarget::Words => app.reload_wordlist(),
             EditTarget::Banner => app.reload_banner(),
             EditTarget::Themes => app.reload_themes(),
         },
