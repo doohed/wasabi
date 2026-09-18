@@ -66,12 +66,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         Line::from(""),
     ];
 
-    // Every length, at the modifiers in force: the table is about how long
-    // you type for, and the panel's heading says what the test was.
-    let modifiers = app.modifiers();
+    // Every length, at the setting in force: the table is about how long you
+    // type for, and the panel's heading says what kind of test it was.
+    let mode = app.mode();
 
     for seconds in DURATIONS {
-        let key = modifiers.key(seconds);
+        let key = mode.key(seconds);
         let runs = records.runs(&key);
 
         let line = match records.best(&key) {
@@ -95,7 +95,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         lines.push(line);
     }
 
-    let title = match modifiers.label() {
+    let title = match mode.label() {
         Some(label) => format!(" records · {label} "),
         None => " records ".to_string(),
     };

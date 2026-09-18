@@ -15,6 +15,7 @@ fn label(item: MenuItem) -> String {
     match item {
         MenuItem::Duration(seconds) => format!("{seconds} seconds"),
         MenuItem::Words => "words".to_string(),
+        MenuItem::Code => "code".to_string(),
         MenuItem::Punctuation => "punctuation".to_string(),
         MenuItem::Numbers => "numbers".to_string(),
         MenuItem::Banner => "banner".to_string(),

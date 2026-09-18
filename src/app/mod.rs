@@ -6,7 +6,9 @@ use crate::config::theme::{Theme, Themes};
 use crate::scores::history::History;
 use crate::scores::records::Records;
 use crate::typing::misses::Misses;
+use crate::typing::mode::{Language, Mode};
 use crate::typing::modifiers::Modifiers;
+use crate::typing::snippets;
 use crate::typing::timeline::{self, Timeline};
 use crate::typing::word::{CharState, Word};
 use crate::typing::wordlist::Wordlist;
@@ -26,6 +28,7 @@ pub enum Screen {
     Test,
     Menu,
     Words,
+    Code,
     Banner,
     Theme,
     Records,
@@ -46,6 +49,8 @@ pub enum MenuItem {
     Duration(u64),
     /// Open the words screen, where the pool the test draws from is chosen.
     Words,
+    /// Open the code picker, where a language is chosen — or none of them.
+    Code,
     /// Punctuate the words the test deals.
     Punctuation,
     /// Put the occasional number among them.
@@ -62,17 +67,28 @@ pub enum MenuItem {
 ///
 /// What the test is comes first — its length, its words, what is done to them
 /// — then how it looks, then how it went.
-pub const MENU: [MenuItem; DURATIONS.len() + 6] = [
+pub const MENU: [MenuItem; DURATIONS.len() + 7] = [
     MenuItem::Duration(DURATIONS[0]),
     MenuItem::Duration(DURATIONS[1]),
     MenuItem::Duration(DURATIONS[2]),
     MenuItem::Words,
+    MenuItem::Code,
     MenuItem::Punctuation,
     MenuItem::Numbers,
     MenuItem::Banner,
     MenuItem::Theme,
     MenuItem::Records,
 ];
+
+/// The code picker, top to bottom: the way out, then every language.
+///
+/// Built rather than written out, so adding a language to [`Language::ALL`] is
+/// the only edit a new language needs.
+pub fn code_rows() -> Vec<Option<Language>> {
+    std::iter::once(None)
+        .chain(Language::ALL.into_iter().map(Some))
+        .collect()
+}
 
 /// How many characters past the end of a word the user is allowed to type.
 ///
@@ -233,9 +249,11 @@ impl App {
     /// Everything chosen by the user — the duration, the screen, the records —
     /// survives; only the run itself is reset.
     pub fn restart(&mut self) {
-        self.words = self
-            .wordlist
-            .deal(self.duration.as_secs(), self.modifiers());
+        let seconds = self.duration.as_secs();
+        self.words = match self.mode() {
+            Mode::Words(modifiers) => self.wordlist.deal(seconds, modifiers),
+            Mode::Code(language) => snippets::deal(language, seconds),
+        };
         self.cursor_word = 0;
         self.started_at = None;
         self.ended_at = None;
@@ -271,8 +289,19 @@ impl App {
         // A message belongs to the screen that produced it.
         self.status = None;
 
+        // The picker borrowed `menu_index`; hand it back pointing at the row
+        // that opened it, rather than at whatever it was left on.
+        if self.screen == Screen::Code {
+            self.menu_index = MENU
+                .iter()
+                .position(|item| *item == MenuItem::Code)
+                .unwrap_or(0);
+        }
+
         self.screen = match self.screen {
-            Screen::Words | Screen::Banner | Screen::Theme | Screen::Records => Screen::Menu,
+            Screen::Words | Screen::Code | Screen::Banner | Screen::Theme | Screen::Records => {
+                Screen::Menu
+            }
             Screen::Menu | Screen::Test => Screen::Test,
         };
     }
@@ -283,6 +312,20 @@ impl App {
         self.menu_index = (self.menu_index as isize + delta).rem_euclid(len) as usize;
     }
 
+    /// Move the highlight in the code picker, wrapping at both ends.
+    pub fn code_move(&mut self, delta: isize) {
+        let len = code_rows().len() as isize;
+        self.menu_index = (self.menu_index as isize + delta).rem_euclid(len) as usize;
+    }
+
+    /// Type the highlighted language, and go back to the test.
+    pub fn code_select(&mut self) {
+        let choice = code_rows()[self.menu_index];
+
+        self.set_language(choice);
+        self.screen = Screen::Test;
+    }
+
     /// Activate the highlighted row.
     pub fn menu_select(&mut self) {
         match MENU[self.menu_index] {
@@ -291,6 +334,16 @@ impl App {
                 self.screen = Screen::Test;
             }
             MenuItem::Words => self.screen = Screen::Words,
+            MenuItem::Code => {
+                // Open on the choice in force, not wherever the menu's cursor
+                // happened to be — the two lists share `menu_index`.
+                let chosen = self.mode().language();
+                self.menu_index = code_rows()
+                    .iter()
+                    .position(|row| *row == chosen)
+                    .unwrap_or(0);
+                self.screen = Screen::Code;
+            }
             MenuItem::Punctuation => self.toggle_punctuation(),
             MenuItem::Numbers => self.toggle_numbers(),
             MenuItem::Banner => self.screen = Screen::Banner,
@@ -305,12 +358,16 @@ impl App {
     /// choice of one, and the modifiers are two independent switches, so there
     /// is no single row that is "the" active one.
     pub fn menu_ticked(&self, item: MenuItem) -> bool {
-        let modifiers = self.modifiers();
+        // The word settings are ticked by what is *in force*, not by what is
+        // stored: in code mode they are remembered but have no say, and a tick
+        // beside a row that changes nothing would be a lie.
+        let modifiers = self.mode().modifiers();
 
         match item {
             MenuItem::Duration(seconds) => seconds == self.duration.as_secs(),
-            MenuItem::Punctuation => modifiers.punctuation,
-            MenuItem::Numbers => modifiers.numbers,
+            MenuItem::Code => self.mode().language().is_some(),
+            MenuItem::Punctuation => modifiers.is_some_and(|m| m.punctuation),
+            MenuItem::Numbers => modifiers.is_some_and(|m| m.numbers),
             MenuItem::Words | MenuItem::Banner | MenuItem::Theme | MenuItem::Records => false,
         }
     }
@@ -336,36 +393,51 @@ impl App {
         self.duration
     }
 
-    /// What the test does to its words once they're dealt.
-    pub fn modifiers(&self) -> Modifiers {
-        self.settings.modifiers()
+    /// What kind of test this is.
+    pub fn mode(&self) -> Mode {
+        self.settings.mode()
     }
 
-    /// The name this run's records are filed under: its length, and what was
-    /// done to its words.
+    /// The name this run's records are filed under: its length, and what kind
+    /// of test it was.
     pub fn record_key(&self) -> String {
-        self.modifiers().key(self.duration.as_secs())
+        self.mode().key(self.duration.as_secs())
+    }
+
+    /// Type a language's code, or `None` to go back to the word test.
+    ///
+    /// The word settings are left on disk untouched, so turning code off finds
+    /// punctuation exactly as you left it.
+    pub fn set_language(&mut self, language: Option<Language>) {
+        self.settings.set_language(language);
+        self.restart();
     }
 
     pub fn toggle_punctuation(&mut self) {
-        let mut modifiers = self.modifiers();
+        let mut modifiers = self.settings.modifiers();
         modifiers.punctuation = !modifiers.punctuation;
         self.set_modifiers(modifiers);
     }
 
     pub fn toggle_numbers(&mut self) {
-        let mut modifiers = self.modifiers();
+        let mut modifiers = self.settings.modifiers();
         modifiers.numbers = !modifiers.numbers;
         self.set_modifiers(modifiers);
     }
 
     /// Change what the test does to its words, and remember it for next time.
     ///
+    /// Turns the code test off, because these are settings *of the word test*:
+    /// asking for punctuation is asking for the test that can have it, and a
+    /// tick appearing beside a row that changed nothing would be worse than
+    /// the switch.
+    ///
     /// Always restarts, for the same reason a change of length does: the words
     /// on screen were dealt under the old setting, and finishing them would
     /// score a test nobody chose.
     fn set_modifiers(&mut self, modifiers: Modifiers) {
         self.settings.set_modifiers(modifiers);
+        self.settings.set_language(None);
         self.restart();
     }
 

@@ -33,6 +33,7 @@ while typing — `q` types a `q`. That leaves Esc, Tab, and modifiers.
 | | |
 |---|---|
 | `space` | commit the current word |
+| `enter` | the same, and how you end a line of code |
 | `backspace` | delete a character, or step back a word |
 | `tab` | restart with a fresh word list |
 | `esc` | open the menu |
@@ -143,6 +144,37 @@ The built-in list is the 200 most common English words, which is what
 MonkeyType's default test draws from: short and overwhelmingly ASCII, so lines
 wrap predictably and the test measures typing rather than reading.
 
+### Code
+
+Type pre-written code instead of words. Pick a language — C or Rust — and the
+test deals whole snippets of it: a binary search, a bubble sort, a gcd. Short
+and deliberately ordinary, so what it measures is your hands on the punctuation
+rather than your memory of a clever algorithm.
+
+Code keeps its lines. A snippet isn't reflowed to fill the column — reflowed
+code stops looking like code, which is the only reason to type it — so the
+break happens where the author put it.
+
+**Indentation is drawn, not typed.** Lining code up is the editor's job in real
+life, and a test that charged you for leading spaces would be measuring your
+patience. `enter` ends a line, the way it would in an editor; `space` does the
+same thing, and neither is scored against the other.
+
+Blank lines are dropped — there is nothing to type on one — and the snippets
+are compiled into the binary rather than read from a file. Unlike the word list
+a snippet has to actually *be* valid code, and checking that is not something
+this app can do for a file someone hands it.
+
+A code test is its own test for records: a snippet full of braces scores
+nothing like a page of common words, so it doesn't have to compete with your
+word-test personal best and lose.
+
+Punctuation and numbers have no say over code that was written with its own, so
+they're greyed out of force while a language is selected — the menu shows no
+tick beside them. Turning either back on switches you back to the word test,
+because asking for punctuation is asking for the test that can have it; your
+word settings are remembered untouched in the meantime.
+
 ### Punctuation and numbers
 
 Two switches in the menu, each with a `✓` when it's on.
@@ -172,10 +204,10 @@ The accuracy shown is *that run's*, not your best ever — a personal best is on
 result, and splitting it across runs would flatter you. Abandoned runs aren't
 recorded.
 
-Each combination of length and modifiers keeps its own record, and the heading
+Each combination of length and setting keeps its own record, and the heading
 says which one you're looking at. A punctuated test is a different test — the
-same argument the length makes — so it doesn't have to compete with the plain
-one and lose. Swapping your word list doesn't split them, though: the app can't
+same argument the length makes, and a stronger one for a code test — so neither
+has to compete with the plain one and lose. Swapping your word list doesn't split them, though: the app can't
 tell a new list from an edited one, so what you practise on is on you.
 
 Under the table is every run you've finished at the length the test is
@@ -282,7 +314,7 @@ Things you write live in `$XDG_CONFIG_HOME/wasabi`, falling back to
 
 | file | |
 |---|---|
-| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner and modifiers on/off |
+| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner, modifiers, code language |
 | `banner.txt` | your ASCII art, absent until you make one |
 | `words.txt` | your word list, absent until you make one |
 | `themes.conf` | your own palettes, absent until you press `e` in the picker |
@@ -321,6 +353,8 @@ src/
 │   ├── word.rs        one word: its target, what was typed, per-character state
 │   ├── wordlist.rs    the word pool, and its file
 │   ├── modifiers.rs   what the test does to the words once they're dealt
+│   ├── mode.rs        which test this is: words with settings, or a language
+│   ├── snippets.rs    the code the code test deals
 │   ├── timeline.rs    a reading a second, and the figures derived from them
 │   └── misses.rs      which keys went wrong, and the worst of them
 ├── scores/        what finished runs leave behind
@@ -354,6 +388,6 @@ Every loader in `config/` is infallible by design, and so are the two in
 because a scoreboard wouldn't parse would be the wrong trade.
 
 ```sh
-cargo test     # 235 tests, no terminal required
+cargo test     # 256 tests, no terminal required
 cargo clippy --all-targets
 ```

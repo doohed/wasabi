@@ -41,11 +41,21 @@ fn display_width(word: &Word) -> usize {
     word.target.chars().count().max(word.typed.chars().count())
 }
 
+/// Columns of indentation drawn before a word, which is none unless the word
+/// begins a line of code.
+fn indent_width(word: &Word) -> usize {
+    word.indent.unwrap_or(0) as usize
+}
+
 /// Break the word list into lines that fit `width` columns.
 ///
 /// Greedy, and words are never split: the returned ranges partition
 /// `0..words.len()` in order. Kept separate from rendering so the geometry can
 /// be tested without a terminal.
+///
+/// A word that begins a line of code starts one here whatever is left over on
+/// the current line — code that reflowed to fill the column would stop looking
+/// like code, which is the only reason to type it.
 fn wrap(words: &[Word], width: u16) -> Vec<Range<usize>> {
     let width = width as usize;
     if width == 0 {
@@ -57,15 +67,19 @@ fn wrap(words: &[Word], width: u16) -> Vec<Range<usize>> {
     let mut used = 0;
 
     for (index, word) in words.iter().enumerate() {
-        // Every word but the first on a line is preceded by a space.
-        let needed = display_width(word) + if index == start { 0 } else { 1 };
+        let opens_line = index == start;
+        // The first word on a line is preceded by its indent; every other one
+        // by a space.
+        let needed = display_width(word) + if opens_line { indent_width(word) } else { 1 };
 
-        // `index > start` keeps a word too long for the whole line on a line of
+        // `!opens_line` keeps a word too long for the whole line on a line of
         // its own rather than looping forever on an empty one.
-        if used + needed > width && index > start {
+        let broken = !opens_line && (word.indent.is_some() || used + needed > width);
+
+        if broken {
             lines.push(start..index);
             start = index;
-            used = display_width(word);
+            used = indent_width(word) + display_width(word);
         } else {
             used += needed;
         }
@@ -96,6 +110,14 @@ fn scroll_offset(caret_line: usize, total_lines: usize, visible: usize) -> usize
 fn render_line(app: &App, range: Range<usize>) -> Line<'static> {
     let theme = app.theme();
     let mut spans: Vec<Span> = Vec::new();
+
+    // Lining code up is the editor's job in real life, so the indent is drawn
+    // rather than typed. It carries no state: there is nothing here to get
+    // right or wrong.
+    let indent = indent_width(&app.words[range.start]);
+    if indent > 0 {
+        spans.push(Span::raw(" ".repeat(indent)));
+    }
 
     // Set when the caret belongs *after* the last character of a word — the
     // word is fully typed (or overtyped) and the next keystroke should be the
@@ -219,6 +241,47 @@ mod tests {
     fn a_word_wider_than_the_line_gets_a_line_to_itself() {
         let words = words(&["a", "enormous", "b"]);
         assert_eq!(wrap(&words, 3), vec![0..1, 1..2, 2..3]);
+    }
+
+    /// A line of code: the first word carries the indent.
+    fn code_line(indent: u16, targets: &[&str]) -> Vec<Word> {
+        targets
+            .iter()
+            .enumerate()
+            .map(|(position, target)| match position {
+                0 => Word::at_indent(target, indent),
+                _ => Word::new(target),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_line_of_code_starts_a_line_however_much_room_is_left() {
+        let mut words = code_line(0, &["fn", "f()", "{"]);
+        words.extend(code_line(4, &["let", "x", "=", "1;"]));
+        words.extend(code_line(0, &["}"]));
+
+        // Room for all of it on one line, and it still breaks where the code
+        // breaks — reflowed code stops looking like code.
+        assert_eq!(wrap(&words, 80), vec![0..3, 3..7, 7..8]);
+    }
+
+    #[test]
+    fn indentation_takes_up_room_on_its_line() {
+        // "    let x" is nine columns, so eight is not enough for two words.
+        let words = code_line(4, &["let", "x"]);
+
+        assert_eq!(wrap(&words, 8), vec![0..1, 1..2]);
+        assert_eq!(wrap(&words, 9), vec![0..2]);
+    }
+
+    #[test]
+    fn a_long_line_of_code_still_wraps() {
+        // The break is forced *into* new lines, never out of wrapping: a line
+        // wider than the column has to go somewhere.
+        let words = code_line(0, &["aaaa", "bbbb", "cccc"]);
+
+        assert_eq!(wrap(&words, 9), vec![0..2, 2..3]);
     }
 
     #[test]

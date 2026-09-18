@@ -9,6 +9,7 @@
 //! setting that caused it. The fixtures every file shares live here.
 
 use super::*;
+use crate::typing::mode::Language;
 
 mod input;
 mod scores;

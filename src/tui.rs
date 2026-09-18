@@ -63,6 +63,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::Test => test_key(app, key, ctrl),
         Screen::Menu => menu_key(app, key),
         Screen::Words => words_key(app, key),
+        Screen::Code => code_key(app, key),
         Screen::Banner => banner_key(app, key),
         Screen::Theme => theme_key(app, key),
         Screen::Records => {
@@ -82,7 +83,10 @@ fn test_key(app: &mut App, key: KeyEvent, ctrl: bool) {
         KeyCode::Esc => app.open_menu(),
         KeyCode::Tab => app.restart(),
         KeyCode::Backspace => app.backspace(),
-        KeyCode::Char(' ') => app.type_space(),
+        // Enter alongside space: a line of code ends the way it would in an
+        // editor. Both commit the word, and neither is scored against the
+        // other — see `App::type_space`.
+        KeyCode::Char(' ') | KeyCode::Enter => app.type_space(),
         // Guarding on `ctrl` keeps chords (Ctrl-A and friends) from being
         // typed as plain letters.
         KeyCode::Char(c) if !ctrl && !c.is_control() => app.type_char(c),
@@ -98,6 +102,18 @@ fn menu_key(app: &mut App, key: KeyEvent) {
         KeyCode::Up | KeyCode::Char('k') => app.menu_move(-1),
         KeyCode::Down | KeyCode::Char('j') => app.menu_move(1),
         KeyCode::Enter | KeyCode::Char(' ') => app.menu_select(),
+        _ => {}
+    }
+}
+
+/// Keys in the code picker. Chosen with `enter`, because every change deals a
+/// fresh test — there is nothing to preview by moving.
+fn code_key(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc => app.back(),
+        KeyCode::Up | KeyCode::Char('k') => app.code_move(-1),
+        KeyCode::Down | KeyCode::Char('j') => app.code_move(1),
+        KeyCode::Enter | KeyCode::Char(' ') => app.code_select(),
         _ => {}
     }
 }

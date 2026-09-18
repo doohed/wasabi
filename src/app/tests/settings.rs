@@ -96,15 +96,15 @@ fn toggle(app: &mut App, item: MenuItem) {
 #[test]
 fn a_modifier_toggles_from_the_menu_and_is_remembered() {
     let mut app = app(&["cat"]);
-    assert_eq!(app.modifiers(), Modifiers::default());
+    assert_eq!(app.mode(), Mode::default());
 
     toggle(&mut app, MenuItem::Punctuation);
-    assert!(app.modifiers().punctuation);
-    assert!(!app.modifiers().numbers);
+    assert!(app.mode().modifiers().unwrap().punctuation);
+    assert!(!app.mode().modifiers().unwrap().numbers);
     assert!(app.settings.modifiers().punctuation);
 
     toggle(&mut app, MenuItem::Punctuation);
-    assert!(!app.modifiers().punctuation);
+    assert!(!app.mode().modifiers().unwrap().punctuation);
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn toggling_a_modifier_stays_in_the_menu() {
     // Unlike a duration, which closes the menu: the two modifiers are
     // switches, and you may well want to flip both.
     assert_eq!(app.screen, Screen::Menu);
-    assert!(app.modifiers().numbers);
+    assert!(app.mode().modifiers().unwrap().numbers);
 }
 
 #[test]
@@ -395,4 +395,110 @@ fn a_restart_keeps_the_chosen_duration() {
     app.restart();
 
     assert_eq!(app.duration(), Duration::from_secs(15));
+}
+
+// -- code -------------------------------------------------------------
+
+/// Pick a row of the code picker, as a user would.
+fn pick_code(app: &mut App, choice: Option<Language>) {
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Code);
+    app.menu_select();
+
+    assert_eq!(app.screen, Screen::Code);
+    app.menu_index = code_rows().iter().position(|row| *row == choice).unwrap();
+    app.code_select();
+}
+
+#[test]
+fn choosing_a_language_deals_code() {
+    let mut app = app(&["cat"]);
+    pick_code(&mut app, Some(Language::Rust));
+
+    assert_eq!(app.mode(), Mode::Code(Language::Rust));
+    assert_eq!(app.screen, Screen::Test);
+    // Dealt from the snippets, not the word pool: the first word opens a line.
+    assert_eq!(app.words[0].indent, Some(0));
+    assert!(app.words.iter().any(|word| word.indent == Some(4)));
+}
+
+#[test]
+fn the_picker_opens_on_the_language_in_force() {
+    let mut app = app(&["cat"]);
+    pick_code(&mut app, Some(Language::C));
+
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Code);
+    app.menu_select();
+
+    assert_eq!(code_rows()[app.menu_index], Some(Language::C));
+}
+
+#[test]
+fn leaving_the_picker_hands_the_menu_cursor_back() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Code);
+    app.menu_select();
+
+    // The picker borrowed `menu_index`; stepping back must not leave the menu
+    // highlighting whatever row that index happens to name.
+    app.code_move(1);
+    app.back();
+
+    assert_eq!(app.screen, Screen::Menu);
+    assert_eq!(MENU[app.menu_index], MenuItem::Code);
+}
+
+#[test]
+fn turning_code_off_finds_the_word_settings_as_they_were() {
+    let mut app = app(&["cat"]);
+    toggle(&mut app, MenuItem::Punctuation);
+
+    pick_code(&mut app, Some(Language::C));
+    // Remembered, but with no say over a snippet — so no tick beside the row.
+    assert_eq!(app.mode().modifiers(), None);
+    assert!(!app.menu_ticked(MenuItem::Punctuation));
+    assert!(app.menu_ticked(MenuItem::Code));
+
+    pick_code(&mut app, None);
+    assert!(app.mode().modifiers().unwrap().punctuation);
+    assert!(app.menu_ticked(MenuItem::Punctuation));
+}
+
+#[test]
+fn asking_for_punctuation_asks_for_the_test_that_can_have_it() {
+    let mut app = app(&["cat"]);
+    pick_code(&mut app, Some(Language::Rust));
+
+    toggle(&mut app, MenuItem::Numbers);
+
+    // A tick appearing beside a row that changed nothing would be worse than
+    // the switch back to words.
+    assert_eq!(
+        app.mode(),
+        Mode::Words(Modifiers {
+            punctuation: false,
+            numbers: true
+        })
+    );
+    assert!(!app.menu_ticked(MenuItem::Code));
+}
+
+#[test]
+fn a_code_run_is_filed_under_its_language() {
+    let mut app = app(&["cat", "dog"]);
+    pick_code(&mut app, Some(Language::C));
+    assert_eq!(app.record_key(), "30+code:c");
+
+    app.words = ["cat", "dog"].into_iter().map(Word::new).collect();
+    type_str(&mut app, "cat dog");
+    app.started_at = Some(Instant::now() - Duration::from_secs(5));
+    app.type_space();
+
+    // A snippet full of braces scores nothing like a page of common words, so
+    // the plain 30s record is untouched.
+    assert_eq!(app.records().runs("30+code:c"), 1);
+    assert_eq!(app.records().runs("30"), 0);
+    assert_eq!(history(&app, "30+code:c").len(), 1);
 }

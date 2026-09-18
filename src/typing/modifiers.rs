@@ -42,10 +42,10 @@ impl Modifiers {
     ///
     /// A punctuated test is a different test — the same argument the duration
     /// makes — so it keeps its own personal best rather than competing with
-    /// the plain one and losing. The plain test's key is the bare number,
-    /// which is what every records file written before this existed already
-    /// contains.
-    pub fn key(self, seconds: u64) -> String {
+    /// the plain one and losing. Reached through
+    /// [`crate::typing::mode::Mode::key`], which is what knows whether the
+    /// word test is the one being typed at all.
+    pub(super) fn key(self, seconds: u64) -> String {
         let mut key = seconds.to_string();
 
         if self.punctuation {

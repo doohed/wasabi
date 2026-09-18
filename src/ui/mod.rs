@@ -1,5 +1,6 @@
 mod art;
 mod banner;
+mod code;
 mod footer;
 mod graph;
 mod header;
@@ -80,6 +81,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     match app.screen {
         Screen::Test => test(frame, body_area, app),
         Screen::Menu => menu::render(frame, centred(body_area, menu::WIDTH, menu::HEIGHT), app),
+        Screen::Code => code::render(frame, centred(body_area, code::WIDTH, code::HEIGHT), app),
         Screen::Words => words::render(frame, centred(body_area, words::WIDTH, words::HEIGHT), app),
         Screen::Banner => banner::render(
             frame,

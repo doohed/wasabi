@@ -6,7 +6,9 @@
 //! [`crate::scores`], and what the user chose lives in [`crate::config`].
 
 pub mod misses;
+pub mod mode;
 pub mod modifiers;
+pub mod snippets;
 pub mod timeline;
 pub mod word;
 pub mod wordlist;

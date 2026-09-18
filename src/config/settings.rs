@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::config::storage;
+use crate::typing::mode::{Language, Mode};
 use crate::typing::modifiers::Modifiers;
 
 const FILE: &str = "settings.tsv";
@@ -10,6 +11,7 @@ const DURATION: &str = "duration";
 const BANNER: &str = "banner";
 const PUNCTUATION: &str = "punctuation";
 const NUMBERS: &str = "numbers";
+const CODE: &str = "code";
 
 /// Persisted preferences.
 ///
@@ -104,6 +106,30 @@ impl Settings {
     pub fn set_modifiers(&mut self, modifiers: Modifiers) {
         self.set_flag(PUNCTUATION, modifiers.punctuation);
         self.set_flag(NUMBERS, modifiers.numbers);
+        self.save();
+    }
+
+    /// What kind of test this is.
+    ///
+    /// Composed rather than stored whole: the word settings stay on disk while
+    /// a code test is being typed, so switching back finds them as you left
+    /// them. Anything unrecognised in the `code` key reads as the word test,
+    /// which is what a typo in a hand-edited file should cost you.
+    pub fn mode(&self) -> Mode {
+        match self.language() {
+            Some(language) => Mode::Code(language),
+            None => Mode::Words(self.modifiers()),
+        }
+    }
+
+    fn language(&self) -> Option<Language> {
+        Language::from_slug(self.values.get(CODE)?)
+    }
+
+    /// Turn the code test on for a language, or off with `None`.
+    pub fn set_language(&mut self, language: Option<Language>) {
+        let value = language.map_or("off", Language::slug);
+        self.values.insert(CODE.to_string(), value.to_string());
         self.save();
     }
 

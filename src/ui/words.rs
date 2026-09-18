@@ -63,7 +63,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // The modifiers live in the menu, not here, but they decide what you
     // actually type — so the row that says where the words come from also says
     // what happens to them on the way.
-    let applied = match app.modifiers().label() {
+    let applied = match app.mode().label() {
         Some(label) => (label, theme.accent),
         None => (
             "none — the words exactly as the list has them".to_string(),

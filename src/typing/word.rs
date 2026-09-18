@@ -27,6 +27,12 @@ pub enum CharState {
 pub struct Word {
     pub target: String,
     pub typed: String,
+    /// `Some(n)` when this word begins a line, indented `n` columns.
+    ///
+    /// Only the code test sets it — a word test is one long stream, and where
+    /// it breaks is the terminal's business. The indent is drawn, never typed:
+    /// see [`crate::typing::snippets::tokenise`].
+    pub indent: Option<u16>,
 }
 
 impl Word {
@@ -35,6 +41,15 @@ impl Word {
         Self {
             target: target.to_string(),
             typed: String::new(),
+            indent: None,
+        }
+    }
+
+    /// An untouched word that begins a line, indented `indent` columns.
+    pub fn at_indent(target: &str, indent: u16) -> Self {
+        Self {
+            indent: Some(indent),
+            ..Self::new(target)
         }
     }
 
@@ -43,8 +58,8 @@ impl Word {
     #[cfg(test)]
     pub fn with_typed(target: &str, typed: &str) -> Self {
         Self {
-            target: target.to_string(),
             typed: typed.to_string(),
+            ..Self::new(target)
         }
     }
 
