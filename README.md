@@ -6,7 +6,15 @@ A terminal typing test. Written in Rust with
 <img width="1000" height="725" alt="wasabie" src="https://github.com/user-attachments/assets/47af3ff5-9797-4ef0-964d-3b49a68411a0" />
 
 
-I build this just to learn how to use [ratatui](https://ratatui.rs) and for hobbie, I really liked the looks and decided to keep maintaining it.
+I built this just to learn how to use [ratatui](https://ratatui.rs), and for a
+hobby. I really liked the looks and decided to keep maintaining it.
+
+- 15, 30 or 60 second tests, drawn from the 200 most common English words
+- Your own word list, and punctuation and numbers over whatever it holds
+- A code test — pre-written C and Rust, typed as it was written
+- WPM, raw, accuracy, consistency, peak, and the keys you keep missing
+- A graph of the run you just typed, and a graph of every run before it
+- Themes and ASCII art, both yours to replace, both hand-editable text
 
 ## Install
 
@@ -23,7 +31,8 @@ your records and settings alone. Set `INSTALL_DIR` to choose where it goes.
 To run it without installing, `cargo run --release`.
 
 Requires a recent Rust toolchain. No other system dependencies — the built-in
-ASCII art is compiled into the binary, so there is nothing to ship beside it.
+art, word list and code snippets are compiled into the binary, so there is
+nothing to ship beside it.
 
 ## Keys
 
@@ -35,13 +44,14 @@ while typing — `q` types a `q`. That leaves Esc, Tab, and modifiers.
 | `space` | commit the current word |
 | `enter` | the same, and how you end a line of code |
 | `backspace` | delete a character, or step back a word |
-| `tab` | restart with a fresh word list |
+| `tab` | restart, with a fresh deal |
 | `esc` | open the menu |
 | `ctrl-c` | quit |
 
 In the menu, `↑↓` (or `j`/`k`) moves, `enter` selects, `esc` goes back. A `✓`
-marks a setting that's in force — there can be several, since the modifiers are
-switches rather than a choice of one.
+marks a setting that's in force. There can be several — the length is a choice
+of one, but the modifiers are independent switches — and a row with no tick
+beside it is either a screen to open or a setting the current test can't use.
 
 ## What it measures
 
@@ -144,6 +154,25 @@ The built-in list is the 200 most common English words, which is what
 MonkeyType's default test draws from: short and overwhelmingly ASCII, so lines
 wrap predictably and the test measures typing rather than reading.
 
+### Punctuation and numbers
+
+Two switches in the menu, each with a `✓` when it's on.
+
+**Punctuation** attaches marks to about one word in four — mostly commas and
+full stops, sometimes a colon or semicolon, occasionally a pair of quotes or
+brackets — and capitalises the first word of every sentence, looking past a
+closing quote so `end."` still ends one.
+
+**Numbers** replaces about one word in eight with a number of up to four
+digits. Never the first word: a test that opens on a bare number reads as a
+rendering fault rather than a setting you turned on.
+
+Both are transforms over the words after they're dealt, not word lists of their
+own — which is what lets them apply to *your* pool. Turn punctuation on over a
+Spanish list and you get punctuated Spanish, with nothing shipped to make that
+work. Changing either always restarts, for the same reason changing the length
+does: the words on screen were dealt under the old setting.
+
 ### Code
 
 Type pre-written code instead of words. Pick a language — C or Rust — and the
@@ -175,28 +204,9 @@ tick beside them. Turning either back on switches you back to the word test,
 because asking for punctuation is asking for the test that can have it; your
 word settings are remembered untouched in the meantime.
 
-### Punctuation and numbers
-
-Two switches in the menu, each with a `✓` when it's on.
-
-**Punctuation** attaches marks to about one word in four — mostly commas and
-full stops, sometimes a colon or semicolon, occasionally a pair of quotes or
-brackets — and capitalises the first word of every sentence, looking past a
-closing quote so `end."` still ends one.
-
-**Numbers** replaces about one word in eight with a number of up to four
-digits. Never the first word: a test that opens on a bare number reads as a
-rendering fault rather than a setting you turned on.
-
-Both are transforms over the words after they're dealt, not word lists of their
-own — which is what lets them apply to *your* pool. Turn punctuation on over a
-Spanish list and you get punctuated Spanish, with nothing shipped to make that
-work. Changing either always restarts, for the same reason changing the length
-does: the words on screen were dealt under the old setting.
-
 ### Records
 
-A personal best per test length, kept between sessions.
+A personal best per test, kept between sessions.
 
 <img width="536" height="302" alt="image" src="https://github.com/user-attachments/assets/5fa2fb35-ab6d-4068-a3ab-5c6d884f3db8" />
 
@@ -207,22 +217,28 @@ recorded.
 Each combination of length and setting keeps its own record, and the heading
 says which one you're looking at. A punctuated test is a different test — the
 same argument the length makes, and a stronger one for a code test — so neither
-has to compete with the plain one and lose. Swapping your word list doesn't split them, though: the app can't
-tell a new list from an edited one, so what you practise on is on you.
+has to compete with the plain one and lose.
 
-Under the table is every run you've finished at the length the test is
-currently set to, oldest on the left. The quiet line is the runs themselves and
-the accented one is a ten-run trailing average — the same pairing as the
-results graph, where the jagged line is the moment and the smooth one is what
-it adds up to. The dot marks your best.
+Swapping your word list doesn't split them, though: the app can't tell a new
+list from an edited one, so what you practise on is on you.
+
+#### Progress
+
+Under the table is every run you've finished at the setting the test is
+currently on, oldest on the left. The quiet line is the runs themselves and the
+accented one is a ten-run trailing average — the same pairing as the results
+graph, where the jagged line is the moment and the smooth one is what it adds
+up to. The dot marks your best.
 
 One setting rather than all of them, because a 15s run and a 60s run are
-different tests, and so are a plain one and a punctuated one: plotting them on
-one line would put a step in it every time you changed the setting and call
-that improvement. Change the length or the modifiers in the menu and the plot
-follows. The last fifty runs are shown — a line squeezing a thousand runs
-into forty columns is a texture, not a trend — but the axis numbers them by
-where they sit in your whole history, so it agrees with the `runs` column above.
+different tests, and so are a plain one, a punctuated one and a page of Rust:
+plotting them on one line would put a step in it every time you changed the
+setting and call that improvement. Change anything in the menu and the plot
+follows.
+
+The last fifty runs are shown — a line squeezing a thousand runs into forty
+columns is a texture, not a trend — but the axis numbers them by where they sit
+in your whole history, so it agrees with the `runs` column above.
 
 A trailing average rather than one taken from your very first run: a cumulative
 average stops moving once there are a few hundred runs behind it, which answers
@@ -230,7 +246,7 @@ average stops moving once there are a few hundred runs behind it, which answers
 speed axis starts at zero, so a good week looks like a good week rather than a
 cliff.
 
-The plot needs two runs at that length before there's a shape to draw, and it's
+The plot needs two runs at that setting before there's a shape to draw, and it's
 the first thing dropped when the terminal is short — the bests are the record,
 and the picture is a nicer way of looking at what came after them. Nothing is
 plotted from before you upgraded: the history file starts when this version
@@ -314,7 +330,7 @@ Things you write live in `$XDG_CONFIG_HOME/wasabi`, falling back to
 
 | file | |
 |---|---|
-| `settings.tsv` | `key<TAB>value` preferences — theme, test length, banner, modifiers, code language |
+| `settings.tsv` | `key<TAB>value` preferences — theme, length, banner, modifiers, language |
 | `banner.txt` | your ASCII art, absent until you make one |
 | `words.txt` | your word list, absent until you make one |
 | `themes.conf` | your own palettes, absent until you press `e` in the picker |
@@ -324,7 +340,7 @@ Things the app writes live in `$XDG_DATA_HOME/wasabi`, falling back to
 
 | file | |
 |---|---|
-| `records.tsv` | personal bests, one tab-separated line per test length |
+| `records.tsv` | personal bests, one tab-separated line per test |
 | `history.tsv` | every finished run, one tab-separated line each, oldest first |
 
 `history.tsv` is append-only and never trimmed: a run is forty bytes, the file
@@ -336,7 +352,7 @@ bests is losing history, losing a setting is not, so the two deserve different
 backup habits. Versions before this kept everything in the data directory —
 those files are moved into place automatically on first run.
 
-All four are plain text and safe to edit or delete by hand. Reading them is
+All six are plain text and safe to edit or delete by hand. Reading them is
 infallible by design: a missing, unreadable or corrupt file means "no records
 yet" or "default settings", never a failure to start. Refusing to open a typing
 test because a scoreboard wouldn't parse would be the wrong trade.
@@ -382,10 +398,8 @@ makes the typing logic testable without a terminal. `theme` names colours by
 their job — `accent`, `dim`, `error` — never by hue, which is what lets a whole
 palette swap underneath the renderers.
 
-Every loader in `config/` is infallible by design, and so are the two in
-`scores/`: a missing, unreadable or corrupt file means "no records yet" or
-"default settings", never a failure to start. Refusing to open a typing test
-because a scoreboard wouldn't parse would be the wrong trade.
+Every loader in `config/` and `scores/` is infallible, for the reason given
+under [Files](#files) — which is why none of them returns a `Result`.
 
 ```sh
 cargo test     # 256 tests, no terminal required
