@@ -5,7 +5,6 @@
 //! punctuation on over a Spanish list and you get punctuated Spanish, with
 //! nothing shipped to make that work.
 
-use rand::seq::IndexedRandom;
 use rand::RngExt;
 
 /// Roughly one word in this many gets punctuation attached.
@@ -13,10 +12,20 @@ const PUNCTUATED: u32 = 4;
 /// Roughly one word in this many is replaced by a number.
 const NUMBERED: u32 = 8;
 
-/// Marks that end a sentence, so the next word is capitalised.
+/// Marks that end a sentence, so the next word is capitalised. Commonest
+/// first, which is what [`mark`] weights on.
 const SENTENCE: [char; 3] = ['.', '?', '!'];
 /// Marks that don't.
 const CLAUSE: [char; 3] = [',', ';', ':'];
+
+/// How much more often the first mark of a set is picked than either of the
+/// others.
+///
+/// Prose is overwhelmingly full stops and commas. Picking evenly gives a test
+/// where every third sentence ends in an exclamation mark and colons turn up
+/// as often as commas, which reads as a tour of the punctuation rather than as
+/// writing.
+const COMMON: u32 = 6;
 
 /// What the test is doing to its words, beyond dealing them.
 ///
@@ -99,18 +108,26 @@ fn punctuate(words: &mut [String], rng: &mut impl RngExt) {
             continue;
         }
 
-        // Weighted by hand rather than uniformly: prose is mostly commas and
-        // full stops, and a test where every fourth word is in brackets is a
-        // bracket drill.
-        match rng.random_range(0..10u32) {
-            0..=3 => word.push(*SENTENCE.choose(rng).expect("SENTENCE is not empty")),
-            4..=7 => word.push(*CLAUSE.choose(rng).expect("CLAUSE is not empty")),
-            8 => *word = format!("\"{word}\""),
+        // Weighted by hand rather than uniformly: a test where every twentieth
+        // word is in brackets is a bracket drill.
+        match rng.random_range(0..20u32) {
+            0..=7 => word.push(mark(&SENTENCE, rng)),
+            8..=17 => word.push(mark(&CLAUSE, rng)),
+            18 => *word = format!("\"{word}\""),
             _ => *word = format!("({word})"),
         }
     }
 
     capitalise_sentences(words);
+}
+
+/// One mark from `set`, the first far more often than the rest.
+fn mark(set: &[char; 3], rng: &mut impl RngExt) -> char {
+    if rng.random_ratio(COMMON, COMMON + 2) {
+        set[0]
+    } else {
+        set[1 + rng.random_range(0..2usize)]
+    }
 }
 
 /// Capitalise the first word, and every word after a sentence-ending mark.
@@ -225,6 +242,41 @@ mod tests {
                 .to_lowercase();
             assert_eq!(stripped, *before, "{after} is not {before}");
         }
+    }
+
+    #[test]
+    fn the_common_mark_is_the_one_you_mostly_get() {
+        let mut counts = [0; 3];
+        let mut rng = rng();
+
+        for _ in 0..1000 {
+            let got = mark(&SENTENCE, &mut rng);
+            counts[SENTENCE.iter().position(|c| *c == got).unwrap()] += 1;
+        }
+
+        // Full stops far ahead, and the other two still turning up.
+        assert!(counts[0] > counts[1] * 3, "{counts:?}");
+        assert!(counts[0] > counts[2] * 3, "{counts:?}");
+        assert!(counts[1] > 0 && counts[2] > 0, "{counts:?}");
+    }
+
+    #[test]
+    fn brackets_and_quotes_stay_rare() {
+        let mut list = vec!["x".to_string(); 2000];
+        punctuate(&mut list, &mut rng());
+
+        let wrapped = list
+            .iter()
+            .filter(|word| word.starts_with('(') || word.starts_with('"'))
+            .count();
+
+        // Around one word in forty, not one in ten.
+        assert!(wrapped > 0, "nothing was wrapped");
+        assert!(
+            wrapped < list.len() / 20,
+            "{wrapped} of {} wrapped",
+            list.len()
+        );
     }
 
     #[test]
