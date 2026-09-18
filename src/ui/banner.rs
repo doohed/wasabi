@@ -5,8 +5,8 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::app::App;
-use crate::storage;
-use crate::theme::Theme;
+use crate::config::storage;
+use crate::config::theme::Theme;
 
 /// Width of the banner box, in columns.
 pub const WIDTH: u16 = 60;

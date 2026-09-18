@@ -316,27 +316,44 @@ src/
 ├── main.rs        wiring
 ├── tui.rs         terminal setup, event loop, key routing
 ├── app/           all application state — no ratatui types anywhere
-├── word.rs        one word: its target, what was typed, per-character state
-├── wordlist.rs    the word pool, and its file
-├── modifiers.rs   what the test does to the words once they're dealt
-├── records.rs     personal bests, and their file
-├── history.rs     every finished run, and their file
-├── timeline.rs    a reading a second, and the figures derived from them
-├── misses.rs      which keys went wrong, and the worst of them
-├── settings.rs    preferences, and their file
-├── banner.rs      the ASCII art, and its file
-├── theme.rs       every colour the interface uses, and the theme file
-├── storage.rs     where files live, and moving them when that changes
-└── ui/            rendering — reads from App, never writes to it
+├── ui/            rendering — reads from App, never writes to it
+├── typing/        what a test is made of, and how a run went
+│   ├── word.rs        one word: its target, what was typed, per-character state
+│   ├── wordlist.rs    the word pool, and its file
+│   ├── modifiers.rs   what the test does to the words once they're dealt
+│   ├── timeline.rs    a reading a second, and the figures derived from them
+│   └── misses.rs      which keys went wrong, and the worst of them
+├── scores/        what finished runs leave behind
+│   ├── records.rs     personal bests, and their file
+│   └── history.rs     every finished run, and their file
+└── config/        the user's own files, and where they live
+    ├── storage.rs     where files live, and moving them when that changes
+    ├── settings.rs    preferences, and their file
+    ├── banner.rs      the ASCII art, and its file
+    └── theme/         every colour the interface uses
+        ├── mod.rs         the palette, the built-ins, and the collection
+        └── format.rs      reading `themes.conf`
 ```
+
+The three middle folders are split by **how long a thing lives**. Everything in
+`typing/` belongs to one run and is thrown away by the next; `scores/` is what
+outlives the run that made it; `config/` is what the user chose, which outlives
+all of them. That is also why `wordlist.rs` sits under `typing/` despite owning
+a file in the config directory: what it *is* is the pool a test draws from, and
+which directory its file lands in is a detail of the loading.
 
 The one rule worth knowing: **`app` holds no ratatui types and `ui` holds no
 state.** The UI reads from `App`, never the other way round, which is what
-makes the typing logic testable without a terminal. `theme.rs` names colours by
+makes the typing logic testable without a terminal. `theme` names colours by
 their job — `accent`, `dim`, `error` — never by hue, which is what lets a whole
 palette swap underneath the renderers.
 
+Every loader in `config/` is infallible by design, and so are the two in
+`scores/`: a missing, unreadable or corrupt file means "no records yet" or
+"default settings", never a failure to start. Refusing to open a typing test
+because a scoreboard wouldn't parse would be the wrong trade.
+
 ```sh
-cargo test     # 233 tests, no terminal required
+cargo test     # 235 tests, no terminal required
 cargo clippy --all-targets
 ```

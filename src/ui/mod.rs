@@ -18,7 +18,7 @@ use ratatui::widgets::{Block, Padding};
 use ratatui::Frame;
 
 use crate::app::{App, Screen};
-use crate::theme::Theme;
+use crate::config::theme::Theme;
 
 /// Maximum width of the typing column, in terminal columns.
 const CONTENT_WIDTH: u16 = 72;

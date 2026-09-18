@@ -12,7 +12,7 @@
 use std::io::Write;
 use std::path::PathBuf;
 
-use crate::records::unix_now;
+use super::unix_now;
 
 const FILE: &str = "history.tsv";
 
@@ -25,7 +25,7 @@ pub const WINDOW: usize = 10;
 
 /// One completed run.
 ///
-/// The same four figures [`crate::records::Records::submit`] is given, because
+/// The same four figures [`crate::scores::records::Records::submit`] is given, because
 /// the two are filed from the same place about the same run — a history that
 /// could disagree with the records would be worse than no history.
 #[derive(Debug, Clone, PartialEq)]
@@ -145,7 +145,7 @@ pub fn best(runs: &[Run]) -> Option<usize> {
 }
 
 fn history_path() -> Option<PathBuf> {
-    Some(crate::storage::data_dir()?.join(FILE))
+    Some(crate::config::storage::data_dir()?.join(FILE))
 }
 
 /// One tab-separated line per run: `at key wpm accuracy`.

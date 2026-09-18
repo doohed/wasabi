@@ -6,8 +6,8 @@ use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph};
 use ratatui::Frame;
 
 use crate::app::App;
-use crate::theme::Theme;
-use crate::timeline::Sample;
+use crate::config::theme::Theme;
+use crate::typing::timeline::Sample;
 
 /// Rows the caption under the plot takes.
 const CAPTION_HEIGHT: u16 = 1;

@@ -1,15 +1,15 @@
 use std::time::{Duration, Instant};
 
-use crate::banner::Banner;
-use crate::history::History;
-use crate::misses::Misses;
-use crate::modifiers::Modifiers;
-use crate::records::Records;
-use crate::settings::Settings;
-use crate::theme::{Theme, Themes};
-use crate::timeline::{self, Timeline};
-use crate::word::{CharState, Word};
-use crate::wordlist::Wordlist;
+use crate::config::banner::Banner;
+use crate::config::settings::Settings;
+use crate::config::theme::{Theme, Themes};
+use crate::scores::history::History;
+use crate::scores::records::Records;
+use crate::typing::misses::Misses;
+use crate::typing::modifiers::Modifiers;
+use crate::typing::timeline::{self, Timeline};
+use crate::typing::word::{CharState, Word};
+use crate::typing::wordlist::Wordlist;
 
 /// Test lengths offered in the menu, in seconds.
 pub const DURATIONS: [u64; 3] = [15, 30, 60];

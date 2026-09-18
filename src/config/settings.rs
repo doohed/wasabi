@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::modifiers::Modifiers;
-use crate::storage;
+use crate::config::storage;
+use crate::typing::modifiers::Modifiers;
 
 const FILE: &str = "settings.tsv";
 const THEME: &str = "theme";
@@ -50,7 +50,7 @@ impl Settings {
     pub fn theme(&self) -> &str {
         self.values
             .get(THEME)
-            .map_or(crate::theme::DEFAULT, String::as_str)
+            .map_or(crate::config::theme::DEFAULT, String::as_str)
     }
 
     pub fn set_theme(&mut self, name: &str) {
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn settings_default_to_the_default_theme() {
-        assert_eq!(Settings::detached().theme(), crate::theme::DEFAULT);
+        assert_eq!(Settings::detached().theme(), crate::config::theme::DEFAULT);
     }
 
     #[test]

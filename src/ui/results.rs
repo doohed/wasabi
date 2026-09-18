@@ -6,8 +6,8 @@ use ratatui::Frame;
 
 use super::graph;
 use crate::app::App;
-use crate::misses;
-use crate::theme::Theme;
+use crate::config::theme::Theme;
+use crate::typing::misses;
 
 /// Width of the full results dashboard, in columns.
 pub const WIDTH: u16 = 64;

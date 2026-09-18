@@ -7,8 +7,8 @@ use ratatui::Frame;
 
 use super::graph;
 use crate::app::App;
-use crate::history;
-use crate::theme::Theme;
+use crate::config::theme::Theme;
+use crate::scores::history;
 
 /// Rows the caption under the plot takes.
 const CAPTION_HEIGHT: u16 = 1;
@@ -184,7 +184,7 @@ pub fn has_plot(app: &App) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::history::Run;
+    use crate::scores::history::Run;
 
     /// The plain text of a set of labels.
     fn text(labels: Vec<Line<'static>>) -> Vec<String> {

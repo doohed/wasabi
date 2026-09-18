@@ -13,12 +13,12 @@ use std::path::{Path, PathBuf};
 
 use rand::seq::IndexedRandom;
 
-use crate::modifiers::Modifiers;
-use crate::storage;
-use crate::word::Word;
+use crate::config::storage;
+use crate::typing::modifiers::Modifiers;
+use crate::typing::word::Word;
 
 /// The pool shipped with the app, used until the user supplies their own.
-const BUILT_IN: &str = include_str!("../assets/words.txt");
+const BUILT_IN: &str = include_str!("../../assets/words.txt");
 
 /// What a user's own pool is called, inside [`storage::config_dir`].
 const FILE: &str = "words.txt";

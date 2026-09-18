@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The best run ever recorded at one test duration.
 #[derive(Debug, Clone, PartialEq)]
@@ -25,7 +24,7 @@ pub struct Entry {
 ///
 /// A `String` rather than a number of seconds, because the length stopped
 /// being the only thing that makes two tests different: see
-/// [`crate::modifiers::Modifiers::key`]. A plain test's key is the bare
+/// [`crate::typing::modifiers::Modifiers::key`]. A plain test's key is the bare
 /// number, which is exactly what every records file written before that
 /// existed already holds.
 ///
@@ -74,7 +73,7 @@ impl Records {
             entry.best = Some(Best {
                 wpm,
                 accuracy,
-                at: unix_now(),
+                at: super::unix_now(),
             });
         }
 
@@ -97,17 +96,7 @@ impl Records {
 }
 
 fn records_path() -> Option<PathBuf> {
-    Some(crate::storage::data_dir()?.join("records.tsv"))
-}
-
-/// Now, in unix seconds.
-///
-/// The history stamps its runs from here too, so both files read the clock the
-/// same way and [`age`] can be pointed at either.
-pub fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |since| since.as_secs())
+    Some(crate::config::storage::data_dir()?.join("records.tsv"))
 }
 
 /// One tab-separated line per test: `key wpm accuracy at runs`.
@@ -176,7 +165,7 @@ fn parse(text: &str) -> BTreeMap<String, Entry> {
 /// Relative rather than a calendar date: "3d ago" needs no timezone database
 /// and is what you actually want to know about a personal best.
 pub fn age(at: u64) -> String {
-    let seconds = unix_now().saturating_sub(at);
+    let seconds = super::unix_now().saturating_sub(at);
 
     match seconds {
         0..=59 => "just now".to_string(),
@@ -190,6 +179,7 @@ pub fn age(at: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scores::unix_now;
 
     #[test]
     fn a_first_run_is_always_a_personal_best() {

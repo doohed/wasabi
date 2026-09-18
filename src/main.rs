@@ -1,17 +1,9 @@
 mod app;
-mod banner;
-mod history;
-mod misses;
-mod modifiers;
-mod records;
-mod settings;
-mod storage;
-mod theme;
-mod timeline;
+mod config;
+mod scores;
 mod tui;
+mod typing;
 mod ui;
-mod word;
-mod wordlist;
 
 use color_eyre::Result;
 
@@ -22,7 +14,7 @@ fn main() -> Result<()> {
 
     // Before anything reads a file: older versions kept config in the data
     // directory, and those files are still the user's.
-    storage::migrate();
+    config::storage::migrate();
 
     let app = App::new();
     tui::run(app)

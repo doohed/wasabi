@@ -7,8 +7,8 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::app::App;
-use crate::theme::Theme;
-use crate::word::{CharState, Word};
+use crate::config::theme::Theme;
+use crate::typing::word::{CharState, Word};
 
 /// The single place where a character state becomes a colour.
 ///

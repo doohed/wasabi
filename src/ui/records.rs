@@ -6,7 +6,7 @@ use ratatui::Frame;
 
 use super::progress;
 use crate::app::{App, DURATIONS};
-use crate::records;
+use crate::scores::records;
 
 /// Width of the records box, in columns.
 pub const WIDTH: u16 = 48;
