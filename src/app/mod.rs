@@ -651,13 +651,31 @@ impl App {
             return;
         }
 
-        // Read the run before ending it, so the last second of a test is on
-        // the graph rather than lost to the clock running out.
-        self.sample();
-
-        if self.elapsed() >= self.duration {
-            self.end();
+        // Ended first, so the final reading is taken against a clock that has
+        // stopped — otherwise the last second of a test lands on the graph at
+        // whatever moment the loop happened to notice.
+        if self.expired() {
+            self.end_at(self.deadline().expect("a running test has a start"));
         }
+
+        self.sample();
+    }
+
+    /// When the clock runs out: exactly one `duration` after the first
+    /// keystroke. `None` before the test has started.
+    fn deadline(&self) -> Option<Instant> {
+        Some(self.started_at? + self.duration)
+    }
+
+    /// The clock has run out, whether or not anything has noticed yet.
+    ///
+    /// The event loop polls on a timer, so between the deadline and the tick
+    /// that acts on it there is a window of up to that timer's length. This is
+    /// what stops a keystroke landing in that window from counting: it arrived
+    /// after time was up, and the loop being busy is not a reason to score it.
+    fn expired(&self) -> bool {
+        self.deadline()
+            .is_some_and(|deadline| Instant::now() >= deadline)
     }
 
     /// Offer the timeline the run's totals; it decides whether a reading is
@@ -671,12 +689,21 @@ impl App {
         self.timeline.tick(at, correct, keystrokes, mistakes);
     }
 
-    /// Stop the clock and file the result.
+    /// Stop the clock at `at` and file the result.
+    ///
+    /// `at` rather than "now", because the two are not the same thing. A test
+    /// that runs out of time ends on its deadline, however long the loop took
+    /// to notice; only a test that runs out of *words* ends at the moment it
+    /// is discovered, because that moment is when it really ended.
+    ///
+    /// Scoring every 30s run over exactly 30 seconds is what makes two of them
+    /// comparable: the alternative divides each by a slightly different
+    /// number, and calls the difference a change in your typing.
     ///
     /// The order matters: `ended_at` first, so `wpm()` scores the run over the
     /// time it actually took rather than over a clock still running.
-    fn end(&mut self) {
-        self.ended_at = Some(Instant::now());
+    fn end_at(&mut self, at: Instant) {
+        self.ended_at = Some(at);
 
         // Nothing typed, or over too fast for an honest score: not a result.
         if let Some(wpm) = self.wpm().filter(|_| self.keystrokes > 0) {
@@ -714,7 +741,7 @@ impl App {
     /// purpose — those characters become `CharState::Extra` — but only up to
     /// `MAX_OVERFLOW`.
     pub fn type_char(&mut self, c: char) {
-        if self.is_over() {
+        if self.is_over() || self.expired() {
             return;
         }
         self.started_at.get_or_insert_with(Instant::now);
@@ -751,7 +778,7 @@ impl App {
     /// unfinished word stays unfinished, and its remaining characters count as
     /// errors — same as MonkeyType.
     pub fn type_space(&mut self) {
-        if self.is_over() {
+        if self.is_over() || self.expired() {
             return;
         }
 
@@ -776,7 +803,7 @@ impl App {
 
         // Ran out of words before the clock ran out.
         if self.cursor_word >= self.words.len() {
-            self.end();
+            self.end_at(Instant::now());
         }
     }
 

@@ -302,3 +302,48 @@ fn there_is_no_raw_wpm_before_the_clock_starts() {
     let app = app(&["cat"]);
     assert_eq!(app.raw_wpm(), None);
 }
+
+// -- the clock --------------------------------------------------------
+
+#[test]
+fn a_test_is_exactly_as_long_as_its_clock() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat");
+
+    // The loop noticed a quarter of a second late, as a busy one will.
+    app.started_at = Some(Instant::now() - (app.duration() + Duration::from_millis(250)));
+    app.tick();
+
+    // Scored over 30 seconds, not over 30.25: two runs at the same length
+    // divide by the same number, or the difference between them isn't typing.
+    assert!(app.is_over());
+    assert_eq!(app.elapsed(), app.duration());
+}
+
+#[test]
+fn keystrokes_after_the_clock_runs_out_dont_count() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat");
+    let typed = app.keystrokes();
+
+    // Past the deadline, but nothing has ticked yet — the window a keystroke
+    // used to slip through.
+    app.started_at = Some(Instant::now() - (app.duration() + Duration::from_millis(50)));
+    type_str(&mut app, " dog");
+
+    assert_eq!(app.keystrokes(), typed);
+    assert_eq!(app.words[1].typed, "");
+}
+
+#[test]
+fn running_out_of_words_ends_when_it_actually_ended() {
+    let mut app = app(&["cat", "dog"]);
+    app.started_at = Some(Instant::now() - Duration::from_secs(5));
+    type_str(&mut app, "cat dog");
+    app.type_space();
+
+    // Not a deadline this time: the test ended early, and the clock says so.
+    assert!(app.is_over());
+    assert!(app.elapsed() < app.duration());
+    assert!(app.elapsed() >= Duration::from_secs(5));
+}
