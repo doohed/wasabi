@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::banner::Banner;
+use crate::misses::Misses;
 use crate::records::Records;
 use crate::settings::Settings;
 use crate::theme::{Theme, Themes};
@@ -130,6 +131,9 @@ pub struct App {
     /// A reading a second, so the results can show the shape of the run and
     /// not just its total.
     timeline: Timeline,
+    /// Which keys the mistakes were made on, so the results can say what to
+    /// practise rather than only how it went.
+    misses: Misses,
 }
 
 impl App {
@@ -186,6 +190,7 @@ impl App {
             keystrokes: 0,
             mistakes: 0,
             timeline: Timeline::default(),
+            misses: Misses::default(),
         };
 
         app.menu_index = app.duration_index();
@@ -205,6 +210,7 @@ impl App {
         self.keystrokes = 0;
         self.mistakes = 0;
         self.timeline.clear();
+        self.misses.clear();
         self.new_best = false;
     }
 
@@ -535,6 +541,12 @@ impl App {
             self.mistakes += 1;
         }
 
+        // Overflow is charged to the run but to no key: there was no character
+        // to get right, so there is nothing to practise.
+        if let Some(expected) = expected {
+            self.misses.record(expected, expected == c);
+        }
+
         word.typed.push(c);
     }
 
@@ -665,6 +677,11 @@ impl App {
 
     pub fn mistakes(&self) -> usize {
         self.mistakes
+    }
+
+    /// Where the mistakes landed, for the worst keys on the results screen.
+    pub fn misses(&self) -> &Misses {
+        &self.misses
     }
 }
 

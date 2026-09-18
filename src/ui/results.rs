@@ -6,6 +6,7 @@ use ratatui::Frame;
 
 use super::graph;
 use crate::app::App;
+use crate::misses;
 use crate::theme::Theme;
 
 /// Width of the full results dashboard, in columns.
@@ -14,15 +15,15 @@ pub const WIDTH: u16 = 64;
 pub const HEIGHT: u16 = ROWS + 3;
 
 /// Content rows of the dashboard: the score, the personal best, a gap, the
-/// graph, a gap, and two rows of stats.
-const ROWS: u16 = 1 + 1 + 1 + GRAPH_HEIGHT + 1 + 2;
+/// graph, a gap, and three rows of stats.
+const ROWS: u16 = 1 + 1 + 1 + GRAPH_HEIGHT + 1 + 3;
 /// Rows the graph gets, its caption included.
 const GRAPH_HEIGHT: u16 = 9;
 
 /// Width of the short results, for a terminal with no room for the graph.
 pub const COMPACT_WIDTH: u16 = 44;
-/// Seven rows of score, plus the heading and a row of padding each side.
-pub const COMPACT_HEIGHT: u16 = 10;
+/// Eight rows of score, plus the heading and a row of padding each side.
+pub const COMPACT_HEIGHT: u16 = 11;
 
 /// Shown where a figure needs more of a run than there was — an em dash reads
 /// as "nothing to say", where a zero would read as a score of zero.
@@ -70,7 +71,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let [score_area, graph_area, stats_area] = Layout::vertical([
         Constraint::Length(2),                // the score and the personal best
         Constraint::Length(GRAPH_HEIGHT + 1), // the gap above it belongs to it
-        Constraint::Length(3),                // a gap, and the two rows of stats
+        Constraint::Length(4),                // a gap, and the three rows of stats
     ])
     .areas(inner);
 
@@ -141,7 +142,43 @@ fn or_none(value: Option<f64>, unit: &str) -> String {
     value.map_or_else(|| NONE.to_string(), |value| format!("{value:.0}{unit}"))
 }
 
-/// Everything the graph can't say: six figures in two rows of three.
+/// A character written as a key you could press.
+///
+/// Only a space needs the help: printed as itself it is a gap in the row with
+/// a count hanging off it, which reads as a bug rather than a key.
+fn key(c: char) -> String {
+    if c == ' ' {
+        "␣".to_string()
+    } else {
+        c.to_string()
+    }
+}
+
+/// The keys the mistakes were made on, worst first.
+///
+/// The one figure here that isn't a score: accuracy says how much the run cost
+/// you, and this says where to go and get it back. Always a row, like the
+/// personal best, so the dashboard doesn't change height between a clean run
+/// and a messy one — and `NONE` where there is nothing to name, because a
+/// blank would read as a figure that failed to render.
+fn worst_keys(app: &App, theme: &Theme) -> Line<'static> {
+    let worst = app.misses().worst(misses::WORST);
+
+    let value = if worst.is_empty() {
+        NONE.to_string()
+    } else {
+        worst
+            .iter()
+            .map(|miss| format!("{} ×{}", key(miss.key), miss.misses))
+            .collect::<Vec<_>>()
+            .join("  ")
+    };
+
+    Line::from(cell("worst keys", value, theme).to_vec())
+}
+
+/// Everything the graph can't say: six figures in two rows of three, and the
+/// keys that cost you under them.
 fn stats(app: &App, theme: &Theme) -> Paragraph<'static> {
     let timeline = app.timeline();
 
@@ -170,6 +207,7 @@ fn stats(app: &App, theme: &Theme) -> Paragraph<'static> {
     Paragraph::new(vec![
         Line::from(top.concat().to_vec()),
         Line::from(bottom.concat().to_vec()),
+        worst_keys(app, theme),
     ])
     .alignment(Alignment::Center)
 }
@@ -194,6 +232,7 @@ fn compact(app: &App) -> Paragraph<'static> {
             "chars",
             format!("{}/{}", app.keystrokes() - app.mistakes(), app.keystrokes()),
         ),
+        worst_keys(app, theme),
     ])
     .alignment(Alignment::Center)
 }

@@ -63,6 +63,20 @@ well as a steady 100 — it's a question about evenness, not speed.
 
 **Peak** is your fastest single second.
 
+**Worst keys** are the three characters you got wrong most, worst first, with
+the count beside each. Charged to the key you *meant* to hit rather than the
+one you actually pressed — typing `b` where the word wanted `v` is a `v` you
+can go and practise, where the `b` is only where your finger landed that time.
+Characters typed past the end of a word belong to no key at all: there was
+nothing to get right, so they cost you accuracy and name nobody.
+
+They're ranked by what each key cost you over the run, not by how often it went
+wrong per attempt. A rate would put a letter fumbled once out of one above one
+fumbled six times out of sixty, and over a test this short that's the wrong
+thing to send you away to practise. Where two keys cost the same, the rarer one
+ranks first — the same judgement, applied to the one figure left to separate
+them.
+
 None of the speeds appear in the first second of a test. They divide by elapsed
 time, and one character extrapolates to a six-figure score; there is no honest
 number to show that early, so it shows `-- wpm`.
@@ -80,11 +94,16 @@ bad patch keeps costing you long after you've typed past it. Red dots mark the
 seconds you made a mistake in, on the line that shows those seconds.
 
 Both lines are in wpm on one scale, so the distance between them means
-something. Under the graph are the six figures above.
+something. Under the graph are the six figures above, and under those the keys
+that cost you — the one row that isn't a score. The rest of the screen says how
+the run went; that row says what to do about it.
+
+A clean run shows `—` there rather than an empty row, so a blank is never
+something that failed to draw.
 
 The graph is the first thing dropped when the terminal is small, for the same
 reason the art is: the numbers are the result, and the picture is a nicer way
-of looking at them. Below 64 columns or 20 rows you get the figures alone.
+of looking at them. Below 64 columns or 21 rows you get the figures alone.
 
 ## Settings
 
@@ -217,6 +236,7 @@ src/
 ├── wordlist.rs    the word pool
 ├── records.rs     personal bests, and their file
 ├── timeline.rs    a reading a second, and the figures derived from them
+├── misses.rs      which keys went wrong, and the worst of them
 ├── settings.rs    preferences, and their file
 ├── banner.rs      the ASCII art, and its file
 ├── theme.rs       every colour the interface uses, and the theme file
@@ -231,6 +251,6 @@ their job — `accent`, `dim`, `error` — never by hue, which is what lets a wh
 palette swap underneath the renderers.
 
 ```sh
-cargo test     # 168 tests, no terminal required
+cargo test     # 179 tests, no terminal required
 cargo clippy --all-targets
 ```

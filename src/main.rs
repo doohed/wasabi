@@ -1,5 +1,6 @@
 mod app;
 mod banner;
+mod misses;
 mod records;
 mod settings;
 mod storage;

@@ -269,6 +269,55 @@ fn accuracy_starts_at_a_hundred() {
     assert_eq!(app.accuracy(), 100.0);
 }
 
+/// The characters `app` got wrong most, worst first.
+fn worst_keys(app: &App) -> Vec<char> {
+    app.misses()
+        .worst(crate::misses::WORST)
+        .into_iter()
+        .map(|miss| miss.key)
+        .collect()
+}
+
+#[test]
+fn a_miss_is_charged_to_the_key_you_meant_to_hit() {
+    let mut app = app(&["cat"]);
+    type_str(&mut app, "cxt");
+
+    // `x` is only where the finger landed; `a` is the key to practise.
+    assert_eq!(worst_keys(&app), vec!['a']);
+}
+
+#[test]
+fn a_typo_fixed_still_names_its_key() {
+    let mut app = app(&["cat"]);
+    type_str(&mut app, "cx");
+    app.backspace();
+    type_str(&mut app, "at");
+
+    // Same rule as accuracy: the mistake happened, and the text being right
+    // afterwards doesn't unmake it.
+    assert_eq!(worst_keys(&app), vec!['a']);
+}
+
+#[test]
+fn overflow_costs_accuracy_but_names_no_key() {
+    let mut app = app(&["cat"]);
+    type_str(&mut app, "catzz");
+
+    // There was no character to get right, so there is nothing to practise.
+    assert_eq!(app.mistakes(), 2);
+    assert!(worst_keys(&app).is_empty());
+}
+
+#[test]
+fn a_restart_forgets_the_worst_keys() {
+    let mut app = app(&["cat"]);
+    type_str(&mut app, "cxt");
+    app.restart();
+
+    assert!(worst_keys(&app).is_empty());
+}
+
 #[test]
 fn there_is_no_wpm_before_the_clock_starts() {
     let app = app(&["cat"]);
