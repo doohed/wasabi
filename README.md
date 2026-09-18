@@ -405,3 +405,7 @@ under [Files](#files) — which is why none of them returns a `Result`.
 cargo test     # 256 tests, no terminal required
 cargo clippy --all-targets
 ```
+
+## Licence
+
+[MIT](LICENSE). The ASCII art is not mine — credits to whoever drew it.

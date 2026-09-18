@@ -2,6 +2,9 @@
 name = "wasabi"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A terminal typing test."
+repository = "https://github.com/doohed/wasabi"
 
 [dependencies]
 ratatui = "0.30"
