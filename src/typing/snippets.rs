@@ -21,7 +21,7 @@ use super::word::Word;
 /// ends the test, never the snippets running out.
 use super::wordlist::WORDS_PER_SECOND;
 
-const C: [&str; 3] = [
+const C: [&str; 5] = [
     "\
 int binary_search(const int *xs, int n, int key) {
     int lo = 0;
@@ -60,10 +60,36 @@ unsigned long gcd(unsigned long a, unsigned long b) {
     }
     return a;
 }",
+    "\
+int is_prime(int n) {
+    if (n < 2) {
+        return 0;
+    }
+    for (int i = 2; i * i <= n; i++) {
+        if (n % i == 0) {
+            return 0;
+        }
+    }
+    return 1;
+}",
+    "\
+void reverse(char *s, int n) {
+    int lo = 0;
+    int hi = n - 1;
+    while (lo < hi) {
+        char tmp = s[lo];
+        s[lo] = s[hi];
+        s[hi] = tmp;
+        lo++;
+        hi--;
+    }
+}",
 ];
 
-const RUST: [&str; 3] = [
+const RUST: [&str; 5] = [
     "\
+use std::cmp::Ordering;
+
 fn binary_search(xs: &[i32], key: i32) -> Option<usize> {
     let mut lo = 0;
     let mut hi = xs.len();
@@ -100,6 +126,24 @@ fn gcd(mut a: u64, mut b: u64) -> u64 {
         a = tmp;
     }
     a
+}",
+    "\
+fn fibonacci(n: u32) -> u64 {
+    let (mut a, mut b) = (0u64, 1u64);
+    for _ in 0..n {
+        let next = a + b;
+        a = b;
+        b = next;
+    }
+    a
+}",
+    "\
+fn sum_of_even_squares(xs: &[i32]) -> i32 {
+    xs.iter()
+        .copied()
+        .filter(|x| x % 2 == 0)
+        .map(|x| x * x)
+        .sum()
 }",
 ];
 

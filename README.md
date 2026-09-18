@@ -25,29 +25,11 @@ cd wasabi
 ./install.sh
 ```
 
-The script:
+Builds it and drops the binary on your `PATH`. `./install.sh --uninstall`
+removes it, leaving your records and settings alone; `INSTALL_DIR` chooses
+where it goes. Without installing: `cargo run --release`.
 
-1. Checks you have `cargo`, and points you at [rustup](https://rustup.rs) if not
-2. Runs `cargo build --release`
-3. Copies the binary to `~/.cargo/bin`, or `~/.local/bin` if that doesn't exist
-4. Tells you the size, and whether that directory is on your `PATH` — with the
-   exact line to add if it isn't
-
-It touches nothing else: no `sudo`, no system directories, no files outside
-the install directory. It installs over a copy that's currently running, too —
-the binary goes to a temporary name and is renamed into place.
-
-```sh
-INSTALL_DIR=/usr/local/bin ./install.sh   # somewhere else
-./install.sh --uninstall                  # remove the binary
-cargo run --release                       # don't install at all
-```
-
-Uninstalling removes only the binary. Your settings, records, themes and art
-stay where they are — see [Files](#files) — so reinstalling picks up where you
-left off.
-
-Needs a recent Rust toolchain and nothing else: the art, word list and code
+Needs a recent Rust toolchain and nothing else — the art, word list and code
 snippets are compiled into the binary.
 
 ## Settings
@@ -85,8 +67,8 @@ digits, never the first.
 
 ### Code
 
-Pre-written snippets instead of words. Pick C or Rust and you get a binary
-search, a bubble sort or a gcd.
+Pre-written snippets instead of words. Five per language, dealt at random —
+searches, sorts, and the usual small algorithms.
 
 Code keeps its lines — it isn't reflowed to fill the column — and
 **indentation is drawn, not typed**. `enter` ends a line, `space` does the
