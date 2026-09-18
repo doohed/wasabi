@@ -37,7 +37,9 @@ if [ "${1:-}" = "--uninstall" ]; then
         rm -f "$TARGET"
         echo "removed $TARGET"
         echo
-        echo "your records, settings and themes were left alone, in"
+        echo "your settings, words, art and themes were left alone, in"
+        echo "  ${XDG_CONFIG_HOME:-$HOME/.config}/$BIN"
+        echo "and your records and history, in"
         echo "  ${XDG_DATA_HOME:-$HOME/.local/share}/$BIN"
     else
         echo "nothing installed at $TARGET"
