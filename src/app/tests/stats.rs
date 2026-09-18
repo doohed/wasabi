@@ -81,19 +81,52 @@ fn a_perfect_run_scores_the_same_either_way() {
 }
 
 #[test]
-fn wrong_characters_dont_score() {
+fn a_word_with_a_mistake_in_it_scores_nothing() {
     let mut app = app(&["cat"]);
     type_str(&mut app, "cxt");
 
-    assert_eq!(app.correct_chars(), 2);
+    // Not two out of three: the whole word or none of it.
+    assert_eq!(app.correct_chars(), 0);
 }
 
 #[test]
-fn extra_characters_dont_score() {
+fn a_correct_word_scores_itself_and_the_space_after_it() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat ");
+
+    assert_eq!(app.correct_chars(), 4);
+}
+
+#[test]
+fn a_wrong_word_earns_no_space_either() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cxt ");
+
+    // The space is part of what a correct word is worth, so a word that
+    // scores nothing takes the space down with it.
+    assert_eq!(app.correct_chars(), 0);
+}
+
+#[test]
+fn an_unfinished_word_scores_while_it_is_still_right() {
+    let mut app = app(&["cat", "dog"]);
+    type_str(&mut app, "cat d");
+
+    // The clock stops you mid-word; that isn't your mistake.
+    assert_eq!(app.correct_chars(), 5);
+
+    // But only while it *is* still right.
+    type_str(&mut app, "x");
+    assert_eq!(app.correct_chars(), 4);
+}
+
+#[test]
+fn overtyping_a_word_costs_you_the_word() {
     let mut app = app(&["cat"]);
     type_str(&mut app, "catzz");
 
-    assert_eq!(app.correct_chars(), 3);
+    // "catzz" is neither the target nor a prefix of it.
+    assert_eq!(app.correct_chars(), 0);
 }
 
 #[test]
@@ -280,12 +313,12 @@ fn a_restart_forgets_the_shape_of_the_last_run() {
 }
 
 #[test]
-fn raw_wpm_counts_the_keystrokes_that_wpm_throws_away() {
+fn raw_wpm_counts_the_characters_that_wpm_throws_away() {
     let mut app = app(&["cat"]);
     type_str(&mut app, "cxt");
 
-    // A round minute, so the arithmetic is checkable: 2 correct characters
-    // of 3 typed, over one minute.
+    // A round minute, so the arithmetic is checkable: a word worth nothing,
+    // standing in three characters, over one minute.
     let now = Instant::now();
     app.started_at = Some(now - Duration::from_secs(60));
     app.ended_at = Some(now);
@@ -293,8 +326,25 @@ fn raw_wpm_counts_the_keystrokes_that_wpm_throws_away() {
     let wpm = app.wpm().expect("a minute is plenty of elapsed time");
     let raw = app.raw_wpm().expect("likewise");
 
-    assert!((wpm - 0.4).abs() < 1e-9, "got {wpm}");
+    assert!(wpm.abs() < 1e-9, "got {wpm}");
     assert!((raw - 0.6).abs() < 1e-9, "got {raw}");
+}
+
+#[test]
+fn deleting_and_retyping_is_not_worth_double_raw() {
+    let mut app = app(&["cat"]);
+    type_str(&mut app, "cat");
+    let once = app.standing_chars();
+
+    for _ in 0..3 {
+        app.backspace();
+    }
+    type_str(&mut app, "cat");
+
+    // Six keystrokes, one word: the fingers moved twice and only one word
+    // came of it, which is what raw is measuring.
+    assert_eq!(app.keystrokes(), 6);
+    assert_eq!(app.standing_chars(), once);
 }
 
 #[test]

@@ -49,6 +49,15 @@ fn caret(app: &App) -> (usize, usize) {
     (app.cursor_word, app.cursor_char())
 }
 
+/// The row a test at `seconds` is filed under, in `mode`.
+///
+/// Derived rather than written out: the key carries a scoring version, and
+/// bumping that shouldn't send every test in this module looking for a row
+/// that moved.
+fn key(mode: Mode, seconds: u64) -> String {
+    mode.key(seconds)
+}
+
 /// The speeds of every run filed at `key`, oldest first.
 fn history(app: &App, key: &str) -> Vec<f64> {
     app.history().at(key).iter().map(|run| run.wpm).collect()

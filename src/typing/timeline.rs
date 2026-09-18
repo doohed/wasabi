@@ -48,7 +48,7 @@ pub struct Timeline {
     /// The totals as of the last reading, which is what makes each slice a
     /// difference rather than a total.
     at: f64,
-    keystrokes: usize,
+    standing: usize,
     mistakes: usize,
 }
 
@@ -70,7 +70,7 @@ impl Timeline {
     /// Called every frame rather than every second — the event loop has no
     /// second hand, and a short slice divides into a wild speed, so the
     /// decision lives here where the last reading's time is known.
-    pub fn tick(&mut self, at: f64, correct: usize, keystrokes: usize, mistakes: usize) {
+    pub fn tick(&mut self, at: f64, correct: usize, standing: usize, mistakes: usize) {
         let span = at - self.at;
         if span < INTERVAL {
             return;
@@ -81,12 +81,12 @@ impl Timeline {
             wpm: wpm(correct, at),
             // Against the true span, not against `INTERVAL`: a frame can land
             // late, and pretending the slice was a second would inflate it.
-            raw: wpm(keystrokes.saturating_sub(self.keystrokes), span),
+            raw: wpm(standing.saturating_sub(self.standing), span),
             mistakes: mistakes.saturating_sub(self.mistakes),
         });
 
         self.at = at;
-        self.keystrokes = keystrokes;
+        self.standing = standing;
         self.mistakes = mistakes;
     }
 
@@ -120,11 +120,11 @@ impl Timeline {
 
     /// How even the pace was, as a percentage. 100% is a metronome.
     ///
-    /// The coefficient of variation of the per-second speeds, turned the right
-    /// way up: spread relative to the mean, so a steady 40 wpm scores as well
-    /// as a steady 100. `None` until there are two readings to vary between,
-    /// because one number has no spread and calling that perfect would be a
-    /// free 100% for anyone who stops at a second.
+    /// The coefficient of variation of the per-second speeds, mapped through
+    /// [`kogasa`]: spread relative to the mean, so a steady 40 wpm scores as
+    /// well as a steady 100. `None` until there are two readings to vary
+    /// between, because one number has no spread and calling that perfect
+    /// would be a free 100% for anyone who stops at a second.
     pub fn consistency(&self) -> Option<f64> {
         if self.samples.len() < 2 {
             return None;
@@ -145,15 +145,59 @@ impl Timeline {
             .sum::<f64>()
             / count;
 
-        // Clamped because a single burst against a mostly idle run can put the
-        // deviation above the mean, and "-40% consistent" means nothing.
-        Some((1.0 - variance.sqrt() / mean).clamp(0.0, 1.0) * 100.0)
+        Some(kogasa(variance.sqrt() / mean))
     }
+}
+
+/// Map a coefficient of variation from `[0, ∞)` onto `(0, 100]`.
+///
+/// A smoothed `tanh`, and named after whoever
+/// worked it out. The obvious `1 - cov`, clamped, gives every run above a
+/// coefficient of 1 the same flat zero, which throws away the difference
+/// between merely ragged and completely erratic. This never reaches either
+/// end, so there is always a gap left to close.
+fn kogasa(cov: f64) -> f64 {
+    100.0 * (1.0 - (cov + cov.powi(3) / 3.0 + cov.powi(5) / 5.0).tanh())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_metronome_is_perfectly_consistent() {
+        assert!((kogasa(0.0) - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_small_spread_reads_as_the_percentage_you_would_expect() {
+        // The curve hugs `100 * (1 - cov)` where real runs live, which is what
+        // lets the number mean something without a lookup table.
+        for (cov, expected) in [(0.1, 90.0), (0.25, 75.0), (0.5, 50.0)] {
+            let got = kogasa(cov);
+            assert!((got - expected).abs() < 0.2, "{cov} gave {got}");
+        }
+    }
+
+    #[test]
+    fn consistency_keeps_falling_where_the_old_clamp_gave_up() {
+        // The clamp gave every run past a coefficient of 1 the same flat zero;
+        // these are all still distinguishable.
+        let ragged = kogasa(0.75);
+        let bad = kogasa(1.0);
+        let erratic = kogasa(1.5);
+
+        assert!(ragged > bad && bad > erratic, "{ragged} {bad} {erratic}");
+        assert!(erratic > 0.0, "{erratic}");
+    }
+
+    #[test]
+    fn consistency_never_leaves_the_scale() {
+        for step in 0..200 {
+            let score = kogasa(step as f64 / 10.0);
+            assert!((0.0..=100.0).contains(&score), "{score}");
+        }
+    }
 
     /// A timeline read once a second, fed `chars` correct characters and
     /// `mistakes` mistakes in every one of `seconds` seconds.

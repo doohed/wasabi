@@ -20,7 +20,7 @@ pub enum CharState {
 /// actually typed for it.
 ///
 /// Keeping `typed` per-word (rather than one flat buffer for the whole test)
-/// is what makes overflow and word boundaries behave like MonkeyType: extra
+/// is what makes overflow and word boundaries behave: extra
 /// characters pile up at the end of *this* word instead of shifting every
 /// character after it.
 #[derive(Debug, Clone)]
@@ -61,6 +61,33 @@ impl Word {
             typed: typed.to_string(),
             ..Self::new(target)
         }
+    }
+
+    /// Characters this word contributes to the score.
+    ///
+    /// All of them or none: a word with a mistake anywhere in it scores
+    /// nothing, however much of it was right.
+    ///
+    /// `partial` credits what has been typed so far of an *unfinished* word,
+    /// as long as it is still a correct prefix. Only the word under the caret
+    /// gets that: the clock cutting you off mid-word isn't your mistake.
+    pub fn scoring_chars(&self, partial: bool) -> usize {
+        if self.typed == self.target {
+            self.target.chars().count()
+        } else if partial && self.target.starts_with(&self.typed) {
+            self.typed.chars().count()
+        } else {
+            0
+        }
+    }
+
+    /// Characters standing in the text, right or wrong — everything except
+    /// the parts of the target never reached.
+    pub fn standing_chars(&self) -> usize {
+        self.char_states()
+            .iter()
+            .filter(|(_, state)| *state != CharState::Untyped)
+            .count()
     }
 
     /// Classify every character that should be drawn for this word.

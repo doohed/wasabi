@@ -17,7 +17,7 @@ fn finishing_a_test_files_a_record() {
     app.type_space();
 
     assert!(app.is_over());
-    assert_eq!(app.records().runs("30"), 1);
+    assert_eq!(app.records().runs(&key(Mode::default(), 30)), 1);
     assert!(app.is_new_best());
 }
 
@@ -28,7 +28,7 @@ fn a_test_nobody_typed_is_not_a_record() {
     app.tick();
 
     assert!(app.is_over());
-    assert_eq!(app.records().runs("30"), 0);
+    assert_eq!(app.records().runs(&key(Mode::default(), 30)), 0);
     assert!(!app.is_new_best());
 }
 
@@ -38,7 +38,7 @@ fn an_abandoned_test_is_not_a_record() {
     type_str(&mut app, "cat ");
     app.restart();
 
-    assert_eq!(app.records().runs("30"), 0);
+    assert_eq!(app.records().runs(&key(Mode::default(), 30)), 0);
 }
 
 // -- history ----------------------------------------------------------
@@ -52,7 +52,10 @@ fn a_finished_run_is_filed_in_the_history_too() {
 
     // The same figure the records were given, not a second reading of a
     // clock that has moved on since.
-    assert_eq!(history(&app, "30"), vec![app.wpm().unwrap()]);
+    assert_eq!(
+        history(&app, &key(Mode::default(), 30)),
+        vec![app.wpm().unwrap()]
+    );
 }
 
 #[test]
@@ -70,7 +73,7 @@ fn the_history_keeps_the_runs_that_weren_t_bests() {
     // The second run was slower, so the record still belongs to the first —
     // and the history has both, which is the whole point of it.
     assert!(!app.is_new_best());
-    let runs = history(&app, "30");
+    let runs = history(&app, &key(Mode::default(), 30));
     assert_eq!(runs.len(), 2);
     assert!(runs[1] < runs[0]);
 }
@@ -81,7 +84,7 @@ fn a_test_nobody_typed_is_not_in_the_history() {
     app.started_at = Some(Instant::now() - app.duration());
     app.tick();
 
-    assert!(history(&app, "30").is_empty());
+    assert!(history(&app, &key(Mode::default(), 30)).is_empty());
 }
 
 #[test]
@@ -90,7 +93,7 @@ fn an_abandoned_test_is_not_in_the_history() {
     type_str(&mut app, "cat ");
     app.restart();
 
-    assert!(history(&app, "30").is_empty());
+    assert!(history(&app, &key(Mode::default(), 30)).is_empty());
 }
 
 #[test]
@@ -109,7 +112,7 @@ fn a_slower_run_doesnt_clear_the_new_best_flag_of_its_own_run() {
     app.type_space();
 
     assert!(!app.is_new_best());
-    assert_eq!(app.records().runs("30"), 2);
+    assert_eq!(app.records().runs(&key(Mode::default(), 30)), 2);
 }
 
 #[test]

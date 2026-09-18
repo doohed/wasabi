@@ -7,6 +7,17 @@
 
 use super::modifiers::Modifiers;
 
+/// How the scores in the records and history files were worked out.
+///
+/// Bumped when a change makes new scores incomparable with old ones, which
+/// puts them in different rows rather than leaving a step in your history that
+/// has nothing to do with your typing. Version 2 counts whole correct words
+/// where version 1 counted correct characters.
+///
+/// Old rows are never read and never written, but they aren't deleted either —
+/// they are still your history, and a text file is a fine place to leave it.
+const SCORING: u32 = 2;
+
 /// A language the code test can deal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Language {
@@ -62,10 +73,12 @@ impl Mode {
     /// which is what every records file written before any of this existed
     /// already contains.
     pub fn key(self, seconds: u64) -> String {
-        match self {
+        let test = match self {
             Mode::Words(modifiers) => modifiers.key(seconds),
             Mode::Code(language) => format!("{seconds}+code:{}", language.slug()),
-        }
+        };
+
+        format!("v{SCORING}:{test}")
     }
 
     /// What to call this setting on screen, or `None` for the plain word test.
@@ -121,9 +134,10 @@ mod tests {
     }
 
     #[test]
-    fn the_plain_word_test_keeps_the_bare_number() {
-        // Which is what every records file written before any of this holds.
-        assert_eq!(Mode::default().key(30), "30");
+    fn every_key_names_the_scoring_that_produced_it() {
+        // A row written under the old scoring is never matched by a new one,
+        // so the two can't land on the same line and pretend to be comparable.
+        assert_eq!(Mode::default().key(30), "v2:30");
         assert_eq!(Mode::default().label(), None);
     }
 
@@ -131,8 +145,8 @@ mod tests {
     fn a_code_test_is_filed_under_its_language() {
         let mode = Mode::Code(Language::Rust);
 
-        assert_eq!(mode.key(30), "30+code:rust");
-        assert_eq!(Mode::Code(Language::C).key(15), "15+code:c");
+        assert_eq!(mode.key(30), "v2:30+code:rust");
+        assert_eq!(Mode::Code(Language::C).key(15), "v2:15+code:c");
         assert_eq!(mode.label().unwrap(), "Rust code");
     }
 

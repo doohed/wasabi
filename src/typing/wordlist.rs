@@ -1,8 +1,5 @@
 //! The word pool: where the test's words come from.
 //!
-//! The built-in pool is the 200 most common English words, which is what
-//! MonkeyType's default test draws from — short and overwhelmingly ASCII, so
-//! lines wrap predictably and the test measures typing rather than reading.
 //!
 //! It is a file rather than a constant because every other thing the user
 //! might want to change is one: the art, the themes, the settings. A word list

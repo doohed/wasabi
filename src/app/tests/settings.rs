@@ -26,7 +26,7 @@ fn opening_the_menu_abandons_a_run_in_progress() {
 
     assert!(!app.is_running());
     assert_eq!(caret(&app), (0, 0));
-    assert_eq!(app.records().runs("30"), 0);
+    assert_eq!(app.records().runs(&key(Mode::default(), 30)), 0);
 }
 
 #[test]
@@ -147,7 +147,8 @@ fn the_menu_ticks_every_setting_in_force() {
 fn a_modified_run_is_filed_under_its_own_name() {
     let mut app = app(&["cat", "dog"]);
     toggle(&mut app, MenuItem::Punctuation);
-    assert_eq!(app.record_key(), "30+p");
+    // Its own row, not the plain test's.
+    assert_ne!(app.record_key(), key(Mode::default(), 30));
 
     app.words = ["cat", "dog"].into_iter().map(Word::new).collect();
     app.screen = Screen::Test;
@@ -157,10 +158,10 @@ fn a_modified_run_is_filed_under_its_own_name() {
 
     // A punctuated test is a different test, so the plain 30s record is
     // untouched and doesn't have to compete with it.
-    assert_eq!(app.records().runs("30+p"), 1);
-    assert_eq!(app.records().runs("30"), 0);
-    assert_eq!(history(&app, "30+p").len(), 1);
-    assert!(history(&app, "30").is_empty());
+    assert_eq!(app.records().runs(&app.record_key()), 1);
+    assert_eq!(app.records().runs(&key(Mode::default(), 30)), 0);
+    assert_eq!(history(&app, &app.record_key()).len(), 1);
+    assert!(history(&app, &key(Mode::default(), 30)).is_empty());
 }
 
 // -- words ------------------------------------------------------------
@@ -489,7 +490,8 @@ fn asking_for_punctuation_asks_for_the_test_that_can_have_it() {
 fn a_code_run_is_filed_under_its_language() {
     let mut app = app(&["cat", "dog"]);
     pick_code(&mut app, Some(Language::C));
-    assert_eq!(app.record_key(), "30+code:c");
+    // Its own row, not the plain test's.
+    assert_ne!(app.record_key(), key(Mode::default(), 30));
 
     app.words = ["cat", "dog"].into_iter().map(Word::new).collect();
     type_str(&mut app, "cat dog");
@@ -498,7 +500,7 @@ fn a_code_run_is_filed_under_its_language() {
 
     // A snippet full of braces scores nothing like a page of common words, so
     // the plain 30s record is untouched.
-    assert_eq!(app.records().runs("30+code:c"), 1);
-    assert_eq!(app.records().runs("30"), 0);
-    assert_eq!(history(&app, "30+code:c").len(), 1);
+    assert_eq!(app.records().runs(&app.record_key()), 1);
+    assert_eq!(app.records().runs(&key(Mode::default(), 30)), 0);
+    assert_eq!(history(&app, &app.record_key()).len(), 1);
 }

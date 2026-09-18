@@ -10,7 +10,7 @@ use crate::typing::mode::{Language, Mode};
 use crate::typing::modifiers::Modifiers;
 use crate::typing::snippets;
 use crate::typing::timeline::{self, Timeline};
-use crate::typing::word::{CharState, Word};
+use crate::typing::word::Word;
 use crate::typing::wordlist::Wordlist;
 
 /// Test lengths offered in the menu, in seconds.
@@ -93,7 +93,7 @@ pub fn code_rows() -> Vec<Option<Language>> {
 /// How many characters past the end of a word the user is allowed to type.
 ///
 /// Without a cap, holding a key would grow the line without bound and wreck
-/// the layout. MonkeyType has the same limit for the same reason.
+/// the layout.
 const MAX_OVERFLOW: usize = 10;
 
 /// How much typing has to have happened before WPM means anything.
@@ -683,10 +683,10 @@ impl App {
     /// reading `self` and writing `self.timeline` don't overlap.
     fn sample(&mut self) {
         let at = self.elapsed().as_secs_f64();
-        let (correct, keystrokes, mistakes) =
-            (self.correct_chars(), self.keystrokes, self.mistakes);
+        let (correct, standing, mistakes) =
+            (self.correct_chars(), self.standing_chars(), self.mistakes);
 
-        self.timeline.tick(at, correct, keystrokes, mistakes);
+        self.timeline.tick(at, correct, standing, mistakes);
     }
 
     /// Stop the clock at `at` and file the result.
@@ -776,7 +776,6 @@ impl App {
     /// A space on an empty word is ignored, so leading and repeated spaces
     /// can't silently skip words. Note that a word is committed as-is: an
     /// unfinished word stays unfinished, and its remaining characters count as
-    /// errors — same as MonkeyType.
     pub fn type_space(&mut self) {
         if self.is_over() || self.expired() {
             return;
@@ -809,7 +808,7 @@ impl App {
 
     /// Delete one character, stepping back a word when the current one is empty.
     ///
-    /// Stepping back is unconditional here. MonkeyType only lets you return to
+    /// Stepping back is unconditional here. Only lets you return to
     /// a word you got wrong; if you want that, gate the `else if` on
     /// `!self.words[self.cursor_word - 1].is_correct()`.
     pub fn backspace(&mut self) {
@@ -834,17 +833,34 @@ impl App {
 
     /// Characters that count towards the score.
     ///
-    /// Correctly typed characters, plus one per committed word for the space
-    /// that followed it. Incorrect and extra characters contribute nothing —
-    /// that difference between this and [`App::keystrokes`] is what makes WPM
-    /// drop when you make mistakes.
+    /// Whole correct words only — see [`Word::scoring_chars`] — plus one per
+    /// committed word for the space that followed it, which a word only earns
+    /// by being right. The word under the caret is credited for as much of
+    /// itself as is still correct, because the clock stops you mid-word.
     pub fn correct_chars(&self) -> usize {
-        let letters = self
-            .words
+        let committed: usize = self.words[..self.cursor_word]
             .iter()
-            .flat_map(Word::char_states)
-            .filter(|(_, state)| *state == CharState::Correct)
-            .count();
+            .map(|word| match word.scoring_chars(false) {
+                0 => 0,
+                chars => chars + 1, // and the space that ended it
+            })
+            .sum();
+
+        committed
+            + self
+                .current_word()
+                .map_or(0, |word| word.scoring_chars(true))
+    }
+
+    /// Every character standing in the text, right or wrong, plus the spaces
+    /// that were committed.
+    ///
+    /// What [`App::raw_wpm`] scores. Counted from the text rather than from
+    /// [`App::keystrokes`], so typing a word, deleting it and typing it again
+    /// is worth one word here rather than two — the fingers moved twice, but
+    /// only one word came of it.
+    pub fn standing_chars(&self) -> usize {
+        let letters: usize = self.words.iter().map(Word::standing_chars).sum();
 
         letters + self.cursor_word
     }
@@ -875,7 +891,7 @@ impl App {
             return None;
         }
 
-        Some(timeline::wpm(self.keystrokes, elapsed.as_secs_f64()))
+        Some(timeline::wpm(self.standing_chars(), elapsed.as_secs_f64()))
     }
 
     /// The run second by second, for the graph on the results screen.
