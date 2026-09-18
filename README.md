@@ -30,58 +30,11 @@ where it goes. Without installing: `cargo run --release`.
 Needs a recent Rust toolchain and nothing else — the art, word list and code
 snippets are compiled into the binary.
 
-## Keys
-
-Every printable character is test input, so there are no bare letter shortcuts
-while typing: `q` types a `q`.
-
-| | |
-|---|---|
-| `space` | commit the current word |
-| `enter` | the same, and how you end a line of code |
-| `backspace` | delete a character, or step back a word |
-| `tab` | restart, with a fresh deal |
-| `esc` | open the menu |
-| `ctrl-c` | quit |
-
-In the menu, `↑↓` (or `j`/`k`) moves, `enter` selects, `esc` goes back. A `✓`
-marks a setting in force.
-
-## What it measures
-
-| | |
-|---|---|
-| **wpm** | correct characters ÷ 5, over elapsed minutes |
-| **raw wpm** | the same, counting every keystroke right or wrong |
-| **accuracy** | share of keystrokes that hit — charged when you press, so fixing a typo still costs you |
-| **consistency** | how even your pace was; 100% is a metronome, measured against your own average |
-| **peak** | your fastest single second |
-| **worst keys** | the three characters you missed most, charged to the key you *meant* to hit |
-
-The gap between wpm and raw is what the mistakes cost. Nothing appears in the
-first second — one character extrapolates to a six-figure score — so it shows
-`-- wpm` until there is something honest to say.
-
-## Results
-
-When the clock stops, a graph of the run replaces the test.
-
-- **accented line** — your score as it stood at each moment
-- **quiet line** — each second on its own, jagged where the score is smooth
-- **red dots** — the seconds you made a mistake in
-
-Under it are the six figures, and under those the keys that cost you. Below 64
-columns or 21 rows the graph is dropped and you get the figures alone.
-
 ## Settings
 
-Press `esc`, then pick a row.
+Press `esc`, to access settings.
 
 <img width="493" height="345" alt="image" src="https://github.com/user-attachments/assets/cd9fae4f-a904-4ad0-b81f-921b6a8f6bb8" />
-
-### Test length
-
-15, 30 or 60 seconds, remembered between sessions. Changing it restarts.
 
 ### Words
 
@@ -124,17 +77,13 @@ word settings are remembered meanwhile.
 
 ### Records
 
-A personal best per test, kept between sessions.
-
-<img width="536" height="302" alt="image" src="https://github.com/user-attachments/assets/5fa2fb35-ab6d-4068-a3ab-5c6d884f3db8" />
-
 The accuracy shown is *that run's*, not your best ever. Abandoned runs aren't
 recorded. Each combination of length and setting keeps its own record — a
 punctuated test and a page of Rust score nothing like plain words — and the
 heading says which you're looking at. Swapping your word list doesn't split
 them: the app can't tell a new list from an edited one.
 
-#### Progress
+### Progress
 
 Under the table, every run you've finished at the current setting, oldest on
 the left. The quiet line is the runs; the accented one is a ten-run trailing
@@ -164,8 +113,6 @@ screen, and the screen tells you how many rows it needs.
 
 ### Themes
 
-<img width="476" height="297" alt="image" src="https://github.com/user-attachments/assets/963ef956-1ad7-4228-b09e-eeeeac385e9d" />
-
 Moving the highlight applies the theme, so the interface is the preview.
 `default` uses *named* terminal colours and inherits your terminal's palette;
 the other four are fixed RGB.
@@ -173,25 +120,6 @@ the other four are fixed RGB.
 #### Your own themes
 
 `e` opens `themes.conf` in `$EDITOR` seeded with an example, `r` reloads it.
-One `[name]` block per theme, every field optional:
-
-```ini
-[tokyonight]
-text    = #c8d3f5   # correctly typed characters, and the clock
-muted   = #a9b8e8   # menu rows
-dim     = #3b4261   # untyped characters, labels, panel borders
-error   = #ff757f   # a character that doesn't match
-extra   = #ff98a4   # characters typed past the end of a word
-accent  = #82aaff   # numbers, markers, panel titles
-good    = #c3e88d   # a personal best
-warn    = #ffc777   # warnings
-banner  = #82aaff   # the ASCII art above the test
-```
-
-Colours are `#rrggbb` or a terminal colour name (`red`, `lightblue`,
-`darkgray`, …). Names follow your terminal's palette; hex is exact everywhere.
-Naming a block after a built-in replaces it. Your themes are marked `·` in the
-picker, and the picker says how many lines it ignored.
 
 ## Files
 
