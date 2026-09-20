@@ -10,3 +10,4 @@ repository = "https://github.com/doohed/wasabi"
 ratatui = "0.30"
 color-eyre = "0.6"
 rand = "0.10.2"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
