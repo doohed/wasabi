@@ -96,18 +96,28 @@ impl Wordlist {
     /// Drawn with repetition on purpose: sampling without it would bias the
     /// tail of a long test towards the rare, awkward words once the common
     /// ones are used up — and would run dry entirely on a short pool.
+    ///
+    /// The one exception is the word just dealt: `the the` reads as a typo in
+    /// the test rather than as a word to type, so a draw that matches it is
+    /// drawn again. Only when the pool has another word to give, or a pool of
+    /// one word would never deal.
     pub fn deal(&self, seconds: u64, modifiers: Modifiers) -> Vec<Word> {
         let mut rng = rand::rng();
         let count = seconds as usize * WORDS_PER_SECOND;
+        let varied = self.words.iter().any(|word| *word != self.words[0]);
 
-        let mut words: Vec<String> = (0..count)
-            .map(|_| {
-                self.words
-                    .choose(&mut rng)
-                    .expect("a wordlist is never empty")
-                    .clone()
-            })
-            .collect();
+        let mut words: Vec<String> = Vec::with_capacity(count);
+        while words.len() < count {
+            let word = self
+                .words
+                .choose(&mut rng)
+                .expect("a wordlist is never empty");
+
+            if varied && words.last() == Some(word) {
+                continue;
+            }
+            words.push(word.clone());
+        }
 
         modifiers.apply(&mut words, &mut rng);
 
@@ -230,6 +240,14 @@ mod tests {
 
         assert_eq!(words.len(), 15 * WORDS_PER_SECOND);
         assert!(words.iter().all(|word| word.target == "cat"));
+    }
+
+    #[test]
+    fn the_same_word_is_never_dealt_twice_in_a_row() {
+        // Two words, so a repeat would turn up within a few draws if allowed.
+        let words = wordlist(&["cat", "dog"]).deal(60, Modifiers::default());
+
+        assert!(words.windows(2).all(|pair| pair[0].target != pair[1].target));
     }
 
     #[test]
