@@ -17,10 +17,10 @@ A terminal typing test, written in Rust with [ratatui](https://ratatui.rs).
 ```sh
 git clone https://github.com/doohed/wasabi.git
 cd wasabi
-./install.sh
+cargo install --path .
 ```
 
-Needs a recent Rust toolchain. `./install.sh --uninstall` removes it (your
+Needs a recent Rust toolchain. `cargo uninstall wasabi` removes it (your
 records stay). Or just `cargo run --release`.
 
 ## Settings
