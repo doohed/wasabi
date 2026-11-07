@@ -5,6 +5,15 @@ use crate::config::storage;
 /// The art shipped with the app, used until the user supplies their own.
 const BUILT_IN: &str = include_str!("../../assets/wasabi.txt");
 
+/// What colour each character of the built-in art is: one letter per
+/// character, laid out exactly like the art. `s` is salmon, `l` the lighter
+/// stripes of fat across it, `r` the rice showing underneath; `.` marks a
+/// blank character, whose colour doesn't matter.
+///
+/// Tied to `BUILT_IN`'s shape: change the art and this has to follow. A test
+/// checks the two line up.
+const BUILT_IN_COLOURS: &str = include_str!("../../assets/wasabi.colours");
+
 /// What a user's own art is called, inside [`storage::config_dir`].
 const FILE: &str = "banner.txt";
 
@@ -51,6 +60,13 @@ impl Banner {
 
     pub fn art(&self) -> &str {
         &self.art
+    }
+
+    /// For the built-in art, the colour map (see [`BUILT_IN_COLOURS`]).
+    /// `None` for the user's own art, which is drawn in one colour since there
+    /// is no telling which part is which.
+    pub fn colours(&self) -> Option<&'static str> {
+        (!self.custom).then_some(BUILT_IN_COLOURS)
     }
 
     pub fn is_custom(&self) -> bool {
@@ -202,8 +218,36 @@ mod tests {
             widths.iter().all(|width| *width == widths[0]),
             "ragged widths: {widths:?}"
         );
-        assert_eq!(banner.height(), 20);
-        assert_eq!(banner.width(), 41);
+        assert_eq!(banner.height(), 10);
+        assert_eq!(banner.width(), 25);
+    }
+
+    #[test]
+    fn the_colour_map_lines_up_with_the_built_in_art() {
+        // Same rows, same width on each, so every character has a colour.
+        let banner = Banner::detached();
+        let art: Vec<usize> = banner.art().lines().map(|l| l.chars().count()).collect();
+        let map: Vec<usize> = BUILT_IN_COLOURS
+            .lines()
+            .map(|l| l.chars().count())
+            .collect();
+
+        assert_eq!(art, map);
+    }
+
+    #[test]
+    fn the_colour_map_uses_only_known_letters() {
+        let unknown: Vec<char> = BUILT_IN_COLOURS
+            .chars()
+            .filter(|c| !matches!(c, 's' | 'l' | 'r' | '.' | '\n'))
+            .collect();
+
+        assert!(unknown.is_empty(), "unknown colours: {unknown:?}");
+    }
+
+    #[test]
+    fn custom_art_has_no_colour_map() {
+        assert_eq!(banner("MY ART").colours(), None);
     }
 
     #[test]

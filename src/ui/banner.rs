@@ -90,20 +90,32 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, screen_height: u16) {
         )
     };
 
-    // Read-only: the art's colour belongs to the theme now. Shown anyway, in
-    // the colour itself, so someone looking for the old `c` key is told where
-    // it went instead of finding nothing.
-    let colour = Line::from(vec![
-        Span::styled(
-            format!(" {:<LABEL_WIDTH$}", "colour"),
-            Style::default().fg(theme.dim),
-        ),
-        Span::styled("████", Style::default().fg(theme.banner)),
-        Span::styled(
-            format!("  from the {} theme", theme.name),
-            Style::default().fg(theme.dim),
-        ),
-    ]);
+    // Read-only: the art's colour belongs to the theme now (or, for the
+    // built-in sushi, to the sushi). Shown anyway, in the colour itself, so
+    // someone looking for the old `c` key is told where it went instead of
+    // finding nothing.
+    let label = Span::styled(
+        format!(" {:<LABEL_WIDTH$}", "colour"),
+        Style::default().fg(theme.dim),
+    );
+    let colour = if banner.is_custom() {
+        Line::from(vec![
+            label,
+            Span::styled("████", Style::default().fg(theme.banner)),
+            Span::styled(
+                format!("  from the {} theme", theme.name),
+                Style::default().fg(theme.dim),
+            ),
+        ])
+    } else {
+        Line::from(vec![
+            label,
+            Span::styled("██", Style::default().fg(super::art::SALMON)),
+            Span::styled("██", Style::default().fg(super::art::STRIPE)),
+            Span::styled("██", Style::default().fg(theme.text)),
+            Span::styled("  salmon on rice", Style::default().fg(theme.dim)),
+        ])
+    };
 
     let mut lines = vec![
         field("showing", source, source_colour, theme),

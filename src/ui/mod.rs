@@ -160,7 +160,13 @@ fn with_art(frame: &mut Frame, area: Rect, app: &App, content_height: u16) -> Op
     ])
     .areas(area);
 
-    art::render(frame, art_area, banner, app.banner_colour());
+    art::render(
+        frame,
+        art_area,
+        banner,
+        app.banner_colour(),
+        app.theme().text,
+    );
     Some(rest)
 }
 
