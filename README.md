@@ -2,8 +2,7 @@
 
 A terminal typing test, written in Rust with [ratatui](https://ratatui.rs).
 
-<img width="1000" height="725" alt="wasabie" src="https://github.com/user-attachments/assets/47af3ff5-9797-4ef0-964d-3b49a68411a0" />
-<img width="1000" height="725" alt="code-test" src="https://github.com/user-attachments/assets/6d203a3d-3814-4746-b0ab-9c411a1c5ba7" />
+<img width="1000" height="730" alt="wasabi" src="https://github.com/user-attachments/assets/1e95662d-88fd-4506-ba1d-f96974233567" />
 
 - 15, 30 or 60 second tests from the 200 most common English words
 - Your own word list, with optional punctuation and numbers
@@ -29,7 +28,7 @@ Press `esc` for settings. Words, banner and themes can all be customised:
 `e` edits the file in `$EDITOR`, `r` reloads it, `x` resets to the built-in
 (`b` toggles the banner).
 
-<img width="1164" height="840" alt="settings" src="https://github.com/user-attachments/assets/f04e1500-febd-455f-b30b-c01152fa0197" />
+<img width="1140" height="832" alt="wasabi" src="https://github.com/user-attachments/assets/3bf89dd5-3f49-4626-94c0-b7fdc2b9cec2" />
 
 ## Files
 
