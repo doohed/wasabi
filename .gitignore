@@ -1,1 +1,33 @@
+# Build output
 /target
+**/*.rs.bk
+*.pdb
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows / Linux
+Thumbs.db
+Desktop.ini
+.directory
+.Trash-*
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.iml
+.fleet/
+.zed/
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+
+# Environment and logs
+.env
+.env.*
+*.log
