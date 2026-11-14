@@ -5,16 +5,16 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use super::progress;
-use crate::app::{App, DURATIONS};
+use crate::app::{App, LENGTHS};
 use crate::scores::records;
 
 /// Width of the records box, in columns.
 pub const WIDTH: u16 = 48;
 
 /// Content rows: the column headings, the blank under them, and one row per
-/// duration. Derived rather than written out, so adding a duration can't
+/// length. Derived rather than written out, so adding a length can't
 /// silently clip the last row off the bottom.
-const ROWS: u16 = DURATIONS.len() as u16 + 2;
+const ROWS: u16 = LENGTHS.len() as u16 + 2;
 /// The table, plus a row of padding top and bottom, plus the heading.
 pub const TABLE_HEIGHT: u16 = ROWS + 3;
 
@@ -48,8 +48,8 @@ pub fn size(area: Rect, app: &App) -> (u16, u16) {
 /// where a zero would read as a score of zero.
 const NONE: &str = "—";
 
-fn row(time: &str, best: &str, accuracy: &str, runs: &str, last: &str) -> String {
-    format!("{time:>5}  {best:>8}  {accuracy:>8}  {runs:>5}   {last:<10}")
+fn row(test: &str, best: &str, accuracy: &str, runs: &str, last: &str) -> String {
+    format!("{test:>5}  {best:>8}  {accuracy:>8}  {runs:>5}   {last:<10}")
 }
 
 /// Personal bests, one row per test length, and progress at the length the
@@ -60,7 +60,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     let mut lines = vec![
         Line::from(Span::styled(
-            row("time", "best", "accuracy", "runs", "set"),
+            row("test", "best", "accuracy", "runs", "set"),
             Style::default().fg(theme.dim),
         )),
         Line::from(""),
@@ -70,14 +70,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // type for, and the panel's heading says what kind of test it was.
     let mode = app.mode();
 
-    for seconds in DURATIONS {
-        let key = mode.key(seconds);
+    for length in LENGTHS {
+        let key = mode.key(length);
+        let name = length.short();
         let runs = records.runs(&key);
 
         let line = match records.best(&key) {
             Some(best) => Line::from(Span::styled(
                 row(
-                    &format!("{seconds}s"),
+                    &name,
                     &format!("{:.0} wpm", best.wpm),
                     &format!("{:.0}%", best.accuracy),
                     &runs.to_string(),
@@ -87,7 +88,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             )),
             // Never attempted: dashes rather than zeroes.
             None => Line::from(Span::styled(
-                row(&format!("{seconds}s"), NONE, NONE, "0", NONE),
+                row(&name, NONE, NONE, "0", NONE),
                 Style::default().fg(theme.dim),
             )),
         };

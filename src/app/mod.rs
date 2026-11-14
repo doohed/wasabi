@@ -4,7 +4,9 @@ use crate::config::banner::Banner;
 use crate::config::settings::Settings;
 use crate::config::theme::{Theme, Themes};
 use crate::scores::history::History;
+use crate::scores::keys::Keys;
 use crate::scores::records::Records;
+use crate::typing::length::Length;
 use crate::typing::misses::Misses;
 use crate::typing::mode::{Language, Mode};
 use crate::typing::modifiers::Modifiers;
@@ -13,11 +15,24 @@ use crate::typing::timeline::{self, Timeline};
 use crate::typing::word::Word;
 use crate::typing::wordlist::Wordlist;
 
-/// Test lengths offered in the menu, in seconds.
-pub const DURATIONS: [u64; 3] = [15, 30, 60];
+/// Test lengths offered in the menu: three clocks, then three word counts.
+pub const LENGTHS: [Length; 6] = [
+    Length::Time(15),
+    Length::Time(30),
+    Length::Time(60),
+    Length::Words(25),
+    Length::Words(50),
+    Length::Words(100),
+];
 
 /// The length a fresh install starts on.
-const DEFAULT_DURATION: u64 = 30;
+const DEFAULT_LENGTH: Length = Length::Time(30);
+
+/// How many weak keys a practice run drills at once.
+///
+/// Enough that the test isn't one letter over and over, few enough that each
+/// of them comes up often — and the header has to be able to name them all.
+pub const FOCUS: usize = 5;
 
 /// Which screen is in front.
 ///
@@ -45,8 +60,8 @@ pub enum EditTarget {
 /// A row of the menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuItem {
-    /// Switch the test to this many seconds.
-    Duration(u64),
+    /// Switch the test to this length.
+    Length(Length),
     /// Open the words screen, where the pool the test draws from is chosen.
     Words,
     /// Open the code picker, where a language is chosen — or none of them.
@@ -55,6 +70,10 @@ pub enum MenuItem {
     Punctuation,
     /// Put the occasional number among them.
     Numbers,
+    /// Deal more of the words holding your weakest keys.
+    Practice,
+    /// Draw a second caret moving at your personal best.
+    Pace,
     /// Open the banner screen, where the art above the test is chosen.
     Banner,
     /// Open the theme picker.
@@ -67,14 +86,19 @@ pub enum MenuItem {
 ///
 /// What the test is comes first — its length, its words, what is done to them
 /// — then how it looks, then how it went.
-pub const MENU: [MenuItem; DURATIONS.len() + 7] = [
-    MenuItem::Duration(DURATIONS[0]),
-    MenuItem::Duration(DURATIONS[1]),
-    MenuItem::Duration(DURATIONS[2]),
+pub const MENU: [MenuItem; LENGTHS.len() + 9] = [
+    MenuItem::Length(LENGTHS[0]),
+    MenuItem::Length(LENGTHS[1]),
+    MenuItem::Length(LENGTHS[2]),
+    MenuItem::Length(LENGTHS[3]),
+    MenuItem::Length(LENGTHS[4]),
+    MenuItem::Length(LENGTHS[5]),
     MenuItem::Words,
     MenuItem::Code,
     MenuItem::Punctuation,
     MenuItem::Numbers,
+    MenuItem::Practice,
+    MenuItem::Pace,
     MenuItem::Banner,
     MenuItem::Theme,
     MenuItem::Records,
@@ -118,8 +142,9 @@ pub struct App {
     /// Highlighted row of the menu.
     pub menu_index: usize,
 
-    /// How long this test runs. Chosen from the menu, and survives a restart.
-    duration: Duration,
+    /// How long this test runs — a time or a word count. Chosen from the
+    /// menu, and survives a restart.
+    length: Length,
     /// Personal bests, loaded once at startup and written back on every
     /// completed test.
     records: Records,
@@ -127,7 +152,12 @@ pub struct App {
     /// plots. Separate from `records` because a best is one number and a
     /// history is all of them.
     history: History,
-    /// Whether the run just finished beat the record for its duration.
+    /// Which keys have been going wrong across runs, for practice to drill.
+    keys: Keys,
+    /// The keys this run is drilling, worked out when it was dealt. Empty
+    /// unless practice is on and there is something to practise.
+    focus: Vec<char>,
+    /// Whether the run just finished beat the record for its length.
     new_best: bool,
 
     /// The pool the test draws its words from.
@@ -175,6 +205,7 @@ impl App {
         Self::build(
             Records::load(),
             History::load(),
+            Keys::load(),
             Wordlist::load(),
             Banner::load(),
             Settings::load(),
@@ -192,6 +223,7 @@ impl App {
         Self::build(
             Records::default(),
             History::default(),
+            Keys::default(),
             Wordlist::detached(),
             Banner::detached(),
             Settings::detached(),
@@ -203,6 +235,7 @@ impl App {
     fn build(
         records: Records,
         history: History,
+        keys: Keys,
         wordlist: Wordlist,
         banner: Banner,
         settings: Settings,
@@ -210,10 +243,10 @@ impl App {
     ) -> Self {
         // Only a length the menu can represent: an arbitrary number from a
         // hand-edited file would run a test the menu couldn't show you.
-        let seconds = settings
-            .duration()
-            .filter(|seconds| DURATIONS.contains(seconds))
-            .unwrap_or(DEFAULT_DURATION);
+        let length = settings
+            .length()
+            .filter(|length| LENGTHS.contains(length))
+            .unwrap_or(DEFAULT_LENGTH);
 
         let mut app = Self {
             words: Vec::new(),
@@ -221,9 +254,11 @@ impl App {
             should_quit: false,
             screen: Screen::Test,
             menu_index: 0,
-            duration: Duration::from_secs(seconds),
+            length,
             records,
             history,
+            keys,
+            focus: Vec::new(),
             new_best: false,
             wordlist,
             banner,
@@ -239,20 +274,24 @@ impl App {
             misses: Misses::default(),
         };
 
-        app.menu_index = app.duration_index();
+        app.menu_index = app.length_index();
         app.restart();
         app
     }
 
     /// Throw the test away and deal a fresh one.
     ///
-    /// Everything chosen by the user — the duration, the screen, the records —
+    /// Everything chosen by the user — the length, the screen, the records —
     /// survives; only the run itself is reset.
+    ///
+    /// The keys to practise are chosen here rather than once at startup, so a
+    /// run that has just shown a new weakness drills it on the very next one.
     pub fn restart(&mut self) {
-        let seconds = self.duration.as_secs();
+        let count = self.length.count();
+        self.focus = self.practice_keys();
         self.words = match self.mode() {
-            Mode::Words(modifiers) => self.wordlist.deal(seconds, modifiers),
-            Mode::Code(language) => snippets::deal(language, seconds),
+            Mode::Words(modifiers) => self.wordlist.deal(count, modifiers, &self.focus),
+            Mode::Code(language) => snippets::deal(language, count),
         };
         self.cursor_word = 0;
         self.started_at = None;
@@ -276,7 +315,7 @@ impl App {
         }
 
         // Open on the current setting, not wherever the cursor was left.
-        self.menu_index = self.duration_index();
+        self.menu_index = self.length_index();
         self.screen = Screen::Menu;
     }
 
@@ -329,8 +368,8 @@ impl App {
     /// Activate the highlighted row.
     pub fn menu_select(&mut self) {
         match MENU[self.menu_index] {
-            MenuItem::Duration(seconds) => {
-                self.set_duration(seconds);
+            MenuItem::Length(length) => {
+                self.set_length(length);
                 self.screen = Screen::Test;
             }
             MenuItem::Words => self.screen = Screen::Words,
@@ -346,6 +385,8 @@ impl App {
             }
             MenuItem::Punctuation => self.toggle_punctuation(),
             MenuItem::Numbers => self.toggle_numbers(),
+            MenuItem::Practice => self.toggle_practice(),
+            MenuItem::Pace => self.toggle_pace(),
             MenuItem::Banner => self.screen = Screen::Banner,
             MenuItem::Theme => self.screen = Screen::Theme,
             MenuItem::Records => self.screen = Screen::Records,
@@ -364,18 +405,20 @@ impl App {
         let modifiers = self.mode().modifiers();
 
         match item {
-            MenuItem::Duration(seconds) => seconds == self.duration.as_secs(),
+            MenuItem::Length(length) => length == self.length,
             MenuItem::Code => self.mode().language().is_some(),
             MenuItem::Punctuation => modifiers.is_some_and(|m| m.punctuation),
             MenuItem::Numbers => modifiers.is_some_and(|m| m.numbers),
+            MenuItem::Practice => modifiers.is_some_and(|m| m.practice),
+            MenuItem::Pace => self.pace_shown(),
             MenuItem::Words | MenuItem::Banner | MenuItem::Theme | MenuItem::Records => false,
         }
     }
 
-    /// Row of `MENU` holding the duration in force, for the menu's marker.
-    pub fn duration_index(&self) -> usize {
+    /// Row of `MENU` holding the length in force, for the menu's marker.
+    pub fn length_index(&self) -> usize {
         MENU.iter()
-            .position(|item| *item == MenuItem::Duration(self.duration.as_secs()))
+            .position(|item| *item == MenuItem::Length(self.length))
             .unwrap_or(0)
     }
 
@@ -383,14 +426,19 @@ impl App {
     ///
     /// Always restarts: a half-typed test measured against a different clock
     /// would be meaningless.
-    fn set_duration(&mut self, seconds: u64) {
-        self.duration = Duration::from_secs(seconds);
-        self.settings.set_duration(seconds);
+    fn set_length(&mut self, length: Length) {
+        self.length = length;
+        self.settings.set_length(length);
         self.restart();
     }
 
-    pub fn duration(&self) -> Duration {
-        self.duration
+    pub fn length(&self) -> Length {
+        self.length
+    }
+
+    /// How long the clock gives you, or `None` for a word test.
+    pub fn limit(&self) -> Option<Duration> {
+        self.length.limit()
     }
 
     /// What kind of test this is.
@@ -401,7 +449,7 @@ impl App {
     /// The name this run's records are filed under: its length, and what kind
     /// of test it was.
     pub fn record_key(&self) -> String {
-        self.mode().key(self.duration.as_secs())
+        self.mode().key(self.length)
     }
 
     /// Type a language's code, or `None` to go back to the word test.
@@ -423,6 +471,67 @@ impl App {
         let mut modifiers = self.settings.modifiers();
         modifiers.numbers = !modifiers.numbers;
         self.set_modifiers(modifiers);
+    }
+
+    pub fn toggle_practice(&mut self) {
+        let mut modifiers = self.settings.modifiers();
+        modifiers.practice = !modifiers.practice;
+        self.set_modifiers(modifiers);
+    }
+
+    /// The keys this run is drilling, weakest first. Empty when practice is
+    /// off, or when it is on with nothing yet to practise.
+    pub fn focus(&self) -> &[char] {
+        &self.focus
+    }
+
+    /// The weakest keys the pool can do anything about.
+    ///
+    /// A key no word holds — a digit, a bracket from the code test — can't be
+    /// practised by dealing words, and naming it in the header would promise
+    /// a drill the test can't deliver.
+    fn practice_keys(&self) -> Vec<char> {
+        if !self.mode().modifiers().is_some_and(|m| m.practice) {
+            return Vec::new();
+        }
+
+        self.keys
+            .weakest()
+            .into_iter()
+            .filter(|key| self.wordlist.has(*key))
+            .take(FOCUS)
+            .collect()
+    }
+
+    // -- pace -------------------------------------------------------------
+
+    /// Whether the pace caret is drawn.
+    pub fn pace_shown(&self) -> bool {
+        self.settings.pace_shown()
+    }
+
+    pub fn toggle_pace(&mut self) {
+        let shown = !self.pace_shown();
+        self.settings.set_pace_shown(shown);
+    }
+
+    /// Where a run at your personal best would be by now, in scoring
+    /// characters — the same unit [`App::correct_chars`] counts in, so the
+    /// two carets race on equal terms.
+    ///
+    /// `None` when the caret is off, before the first keystroke, after the
+    /// end, and when this test has no best to race yet. Constant speed rather
+    /// than a replay of the best run: the best is one number, and a ghost
+    /// that stalled where you stalled that day would be racing your luck.
+    pub fn pace(&self) -> Option<usize> {
+        if !self.pace_shown() || !self.is_running() {
+            return None;
+        }
+
+        let best = self.records.best(&self.record_key())?;
+        let chars = timeline::chars(best.wpm, self.elapsed().as_secs_f64());
+
+        Some(chars.floor() as usize)
     }
 
     /// Change what the test does to its words, and remember it for next time.
@@ -661,10 +770,11 @@ impl App {
         self.sample();
     }
 
-    /// When the clock runs out: exactly one `duration` after the first
-    /// keystroke. `None` before the test has started.
+    /// When the clock runs out: exactly one time limit after the first
+    /// keystroke. `None` before the test has started, and always for a word
+    /// test, which has no clock to run out.
     fn deadline(&self) -> Option<Instant> {
-        Some(self.started_at? + self.duration)
+        Some(self.started_at? + self.length.limit()?)
     }
 
     /// The clock has run out, whether or not anything has noticed yet.
@@ -711,6 +821,7 @@ impl App {
 
             self.new_best = self.records.submit(&key, wpm, accuracy);
             self.history.push(&key, wpm, accuracy);
+            self.keys.absorb(&self.misses);
         }
     }
 
@@ -727,9 +838,10 @@ impl App {
             .duration_since(started_at)
     }
 
-    /// Time left on the clock, for the countdown in the header.
-    pub fn remaining(&self) -> Duration {
-        self.duration.saturating_sub(self.elapsed())
+    /// Time left on the clock, for the countdown in the header. `None` for a
+    /// word test, where the header counts words instead.
+    pub fn remaining(&self) -> Option<Duration> {
+        Some(self.limit()?.saturating_sub(self.elapsed()))
     }
 
     // -- input ------------------------------------------------------------
@@ -769,6 +881,17 @@ impl App {
         }
 
         word.typed.push(c);
+        let finished = word.typed == word.target;
+
+        // A word test ends on its last word typed right, without waiting for
+        // a space: there is nothing after it for the space to lead into, and
+        // the clock would be timing a key that does nothing. A timed test is
+        // dealt more than anyone can type, so it never gets here — and if it
+        // did, its last word would be ended by the clock, as before.
+        let last = self.cursor_word + 1 == self.words.len();
+        if finished && last && matches!(self.length, Length::Words(_)) {
+            self.end_at(Instant::now());
+        }
     }
 
     /// Commit the current word and move to the next one.

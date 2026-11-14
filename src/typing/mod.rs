@@ -5,6 +5,7 @@
 //! outlives the test it describes — what survives a run lives in
 //! [`crate::scores`], and what the user chose lives in [`crate::config`].
 
+pub mod length;
 pub mod misses;
 pub mod mode;
 pub mod modifiers;

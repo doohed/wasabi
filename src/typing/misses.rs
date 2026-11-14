@@ -60,6 +60,17 @@ impl Misses {
         }
     }
 
+    /// Every character the run asked for: `(key, attempts, misses)`.
+    ///
+    /// For [`crate::scores::keys::Keys`], which keeps a tally across runs and
+    /// needs the keys that went right as much as the ones that didn't — a key
+    /// typed cleanly fifty times is evidence too.
+    pub fn counts(&self) -> impl Iterator<Item = (char, usize, usize)> + '_ {
+        self.counts
+            .iter()
+            .map(|(key, count)| (*key, count.attempts, count.misses))
+    }
+
     /// The `n` characters that went wrong most, worst first.
     ///
     /// Ranked by what each one cost, not by how often it went wrong per

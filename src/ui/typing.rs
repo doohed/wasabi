@@ -33,6 +33,41 @@ fn caret(style: Style) -> Style {
     style.add_modifier(Modifier::REVERSED)
 }
 
+/// Mark where a run at your personal best would be.
+///
+/// Underlined rather than reversed, so it can never be mistaken for the caret
+/// you are actually typing at. Ahead of you it sits on text you haven't typed,
+/// which is drawn dim — so it takes the accent there, or it would be a dim
+/// underline under dim text. Behind you it keeps the colour of what you typed,
+/// because whether that was right matters more than where the ghost is.
+fn pace(style: Style, state: CharState, theme: &Theme) -> Style {
+    let style = style.add_modifier(Modifier::UNDERLINED);
+
+    match state {
+        CharState::Untyped => style.fg(theme.accent),
+        _ => style,
+    }
+}
+
+/// Where `chars` scoring characters into the text falls: a word, and an
+/// offset into its target. An offset equal to the target's length is the
+/// space after the word. `None` past the end of the text.
+///
+/// Counted over targets rather than what was typed, and a space per word —
+/// the same characters [`App::correct_chars`] credits, so a pace caret level
+/// with your caret means you are typing at your best.
+fn locate(words: &[Word], mut chars: usize) -> Option<(usize, usize)> {
+    for (index, word) in words.iter().enumerate() {
+        let len = word.target.chars().count();
+        if chars <= len {
+            return Some((index, chars));
+        }
+        chars -= len + 1;
+    }
+
+    None
+}
+
 /// Columns a word occupies on screen.
 ///
 /// The *displayed* width, which is the longer of the target and what was typed
@@ -106,8 +141,9 @@ fn scroll_offset(caret_line: usize, total_lines: usize, visible: usize) -> usize
     caret_line.saturating_sub(band).min(last_offset)
 }
 
-/// Render the words in `range` as one styled line.
-fn render_line(app: &App, range: Range<usize>) -> Line<'static> {
+/// Render the words in `range` as one styled line, with the pace caret at
+/// `ghost` if it falls on it.
+fn render_line(app: &App, range: Range<usize>, ghost: Option<(usize, usize)>) -> Line<'static> {
     let theme = app.theme();
     let mut spans: Vec<Span> = Vec::new();
 
@@ -123,6 +159,8 @@ fn render_line(app: &App, range: Range<usize>) -> Line<'static> {
     // word is fully typed (or overtyped) and the next keystroke should be the
     // space. The separator span drawn on the next iteration claims it.
     let mut caret_on_separator = false;
+    // The same, for the pace caret.
+    let mut ghost_on_separator = false;
 
     for index in range.clone() {
         // Separator between words. The space is not part of either word, so a
@@ -134,6 +172,10 @@ fn render_line(app: &App, range: Range<usize>) -> Line<'static> {
                 style = caret(style);
                 caret_on_separator = false;
             }
+            if ghost_on_separator {
+                style = pace(style, CharState::Untyped, theme);
+                ghost_on_separator = false;
+            }
             spans.push(Span::styled(" ", style));
         }
 
@@ -141,11 +183,18 @@ fn render_line(app: &App, range: Range<usize>) -> Line<'static> {
         let states = word.char_states();
         // `Some(n)` only on the word being typed: n is the caret's offset.
         let caret_at = (index == app.cursor_word).then(|| app.cursor_char());
+        // The ghost goes by the target, so an overtyped word's extras never
+        // hold it: past the target's end, it is on the space.
+        let target_len = word.target.chars().count();
+        let ghost_at = ghost.and_then(|(at, offset)| (at == index).then_some(offset));
 
         for (offset, (character, state)) in states.iter().enumerate() {
             let mut style = style_for(*state, theme);
             if caret_at == Some(offset) {
                 style = caret(style);
+            }
+            if ghost_at == Some(offset) && offset < target_len {
+                style = pace(style, *state, theme);
             }
             spans.push(Span::styled(character.to_string(), style));
         }
@@ -153,16 +202,23 @@ fn render_line(app: &App, range: Range<usize>) -> Line<'static> {
         if caret_at.is_some_and(|offset| offset >= states.len()) {
             caret_on_separator = true;
         }
+        if ghost_at.is_some_and(|offset| offset >= target_len) {
+            ghost_on_separator = true;
+        }
     }
 
     // The caret spilled off the end of the last word on this line: draw it
     // here rather than at the start of the next line, which is where the space
     // would have gone had the line had room for it.
-    if caret_on_separator {
-        spans.push(Span::styled(
-            " ",
-            caret(style_for(CharState::Untyped, theme)),
-        ));
+    if caret_on_separator || ghost_on_separator {
+        let mut style = style_for(CharState::Untyped, theme);
+        if caret_on_separator {
+            style = caret(style);
+        }
+        if ghost_on_separator {
+            style = pace(style, CharState::Untyped, theme);
+        }
+        spans.push(Span::styled(" ", style));
     }
 
     Line::from(spans)
@@ -184,12 +240,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // terminal shows more of the test rather than leaving the room empty.
     let visible = area.height as usize;
     let offset = scroll_offset(caret_line, lines.len(), visible);
+    let ghost = app.pace().and_then(|chars| locate(&app.words, chars));
 
     let rows: Vec<Line> = lines
         .into_iter()
         .skip(offset)
         .take(visible)
-        .map(|range| render_line(app, range))
+        .map(|range| render_line(app, range, ghost))
         .collect();
 
     frame.render_widget(Paragraph::new(rows), area);
@@ -282,6 +339,26 @@ mod tests {
         let words = code_line(0, &["aaaa", "bbbb", "cccc"]);
 
         assert_eq!(wrap(&words, 9), vec![0..2, 2..3]);
+    }
+
+    #[test]
+    fn the_pace_caret_starts_on_the_first_character() {
+        assert_eq!(locate(&words(&["cat", "dog"]), 0), Some((0, 0)));
+    }
+
+    #[test]
+    fn the_pace_caret_counts_the_space_after_each_word() {
+        let words = words(&["cat", "dog"]);
+
+        assert_eq!(locate(&words, 2), Some((0, 2)));
+        assert_eq!(locate(&words, 3), Some((0, 3)), "the space after cat");
+        assert_eq!(locate(&words, 4), Some((1, 0)));
+        assert_eq!(locate(&words, 7), Some((1, 3)));
+    }
+
+    #[test]
+    fn the_pace_caret_past_the_end_is_nowhere() {
+        assert_eq!(locate(&words(&["cat"]), 5), None);
     }
 
     #[test]

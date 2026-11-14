@@ -53,7 +53,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     // The title names the test length, so a score is never ambiguous about
     // which record it was competing for.
-    let panel = super::panel(format!(" {}s test ", app.duration().as_secs()), theme)
+    let panel = super::panel(format!(" {} ", app.length().title()), theme)
         // Centred, unlike the other panels: this one's content is centred
         // too, and a heading hugging the left edge above it reads as a
         // mistake rather than a choice.

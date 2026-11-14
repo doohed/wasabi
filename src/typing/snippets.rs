@@ -14,13 +14,6 @@ use rand::seq::IndexedRandom;
 use super::mode::Language;
 use super::word::Word;
 
-/// Snippets are dealt until the test is this many words long.
-///
-/// The same rate the word test uses. Code tokens are shorter than words on
-/// average, so this overshoots — which is the right way to be wrong: the timer
-/// ends the test, never the snippets running out.
-use super::wordlist::WORDS_PER_SECOND;
-
 const C: [&str; 5] = [
     "\
 int binary_search(const int *xs, int n, int key) {
@@ -157,16 +150,15 @@ impl Language {
     }
 }
 
-/// A test's worth of code for a run of `seconds`.
+/// `count` words of code — see [`crate::typing::length::Length::count`].
 ///
 /// Whole snippets, one after another, until there is enough of it; the last
-/// one is cut off wherever the count lands, because the clock was always going
-/// to stop you somewhere. Drawn at random each time, so a second run at the
+/// one is cut off wherever the count lands, because a test has to stop
+/// somewhere and the end of a snippet is rarely where. Drawn at random each time, so a second run at the
 /// same length isn't the same test.
-pub fn deal(language: Language, seconds: u64) -> Vec<Word> {
+pub fn deal(language: Language, count: usize) -> Vec<Word> {
     let mut rng = rand::rng();
     let snippets = language.snippets();
-    let count = seconds as usize * WORDS_PER_SECOND;
 
     let mut words = Vec::new();
     while words.len() < count {
@@ -244,10 +236,11 @@ mod tests {
     }
 
     #[test]
-    fn a_deal_is_long_enough_for_the_clock() {
+    fn a_deal_is_exactly_as_long_as_asked() {
         for language in Language::ALL {
-            let words = deal(language, 15);
-            assert_eq!(words.len(), 15 * WORDS_PER_SECOND);
+            for count in [25, 75, 300] {
+                assert_eq!(deal(language, count).len(), count);
+            }
         }
     }
 
@@ -255,7 +248,7 @@ mod tests {
     fn a_deal_starts_at_the_beginning_of_a_snippet() {
         // Cut off at the end, never the start: a test opening mid-expression
         // would read as a bug.
-        let words = deal(Language::Rust, 15);
+        let words = deal(Language::Rust, 75);
         assert_eq!(words[0].indent, Some(0));
     }
 

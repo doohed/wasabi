@@ -12,6 +12,9 @@ use super::*;
 use crate::typing::mode::Language;
 
 mod input;
+mod lengths;
+mod pace;
+mod practice;
 mod scores;
 mod settings;
 mod stats;
@@ -44,18 +47,39 @@ fn type_str(app: &mut App, input: &str) {
     }
 }
 
+/// The clock `app` runs on. Every app the tests build is a timed test unless
+/// it says otherwise, so a missing limit is a bug in the test, not a case.
+fn limit(app: &App) -> Duration {
+    app.limit().expect("a timed test")
+}
+
 /// `(cursor_word, cursor_char)` — the caret, as the renderer sees it.
 fn caret(app: &App) -> (usize, usize) {
     (app.cursor_word, app.cursor_char())
 }
 
-/// The row a test at `seconds` is filed under, in `mode`.
+/// The row a test of `length` is filed under, in `mode`.
 ///
 /// Derived rather than written out: the key carries a scoring version, and
 /// bumping that shouldn't send every test in this module looking for a row
 /// that moved.
-fn key(mode: Mode, seconds: u64) -> String {
-    mode.key(seconds)
+fn key(mode: Mode, length: impl Into<Length>) -> String {
+    mode.key(length)
+}
+
+/// Choose a menu row as a user would: open the menu, move to it, select it.
+///
+/// For a switch that toggles it; for a length it sets it.
+fn toggle(app: &mut App, item: MenuItem) {
+    app.open_menu();
+    app.menu_index = menu_row(item);
+    app.menu_select();
+}
+
+/// Pretend the run started `seconds` ago, so it has been going long enough to
+/// score.
+fn started(app: &mut App, seconds: u64) {
+    app.started_at = Some(Instant::now() - Duration::from_secs(seconds));
 }
 
 /// The speeds of every run filed at `key`, oldest first.

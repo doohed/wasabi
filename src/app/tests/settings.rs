@@ -15,7 +15,7 @@ fn the_menu_opens_on_the_duration_in_force() {
     app.open_menu();
 
     assert_eq!(app.screen, Screen::Menu);
-    assert_eq!(MENU[app.menu_index], MenuItem::Duration(30));
+    assert_eq!(MENU[app.menu_index], MenuItem::Length(Length::Time(30)));
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn choosing_a_duration_restarts_the_test() {
     app.menu_index = 0; // 15 seconds
     app.menu_select();
 
-    assert_eq!(app.duration(), Duration::from_secs(15));
+    assert_eq!(app.length(), Length::Time(15));
     assert_eq!(app.screen, Screen::Test);
     assert_eq!(caret(&app), (0, 0));
     // A fresh word list, sized for the new clock.
@@ -78,20 +78,13 @@ fn choosing_a_duration_restarts_the_test() {
 fn choosing_a_duration_remembers_it_for_next_time() {
     let mut app = app(&["cat"]);
     app.open_menu();
-    app.menu_index = menu_row(MenuItem::Duration(15));
+    app.menu_index = menu_row(MenuItem::Length(Length::Time(15)));
     app.menu_select();
 
-    assert_eq!(app.settings.duration(), Some(15));
+    assert_eq!(app.settings.length(), Some(Length::Time(15)));
 }
 
 // -- modifiers --------------------------------------------------------
-
-/// Turn a modifier on or off through the menu, as a user would.
-fn toggle(app: &mut App, item: MenuItem) {
-    app.open_menu();
-    app.menu_index = menu_row(item);
-    app.menu_select();
-}
 
 #[test]
 fn a_modifier_toggles_from_the_menu_and_is_remembered() {
@@ -135,8 +128,8 @@ fn the_menu_ticks_every_setting_in_force() {
     let mut app = app(&["cat"]);
     toggle(&mut app, MenuItem::Punctuation);
 
-    assert!(app.menu_ticked(MenuItem::Duration(30)));
-    assert!(!app.menu_ticked(MenuItem::Duration(15)));
+    assert!(app.menu_ticked(MenuItem::Length(Length::Time(30))));
+    assert!(!app.menu_ticked(MenuItem::Length(Length::Time(15))));
     assert!(app.menu_ticked(MenuItem::Punctuation));
     assert!(!app.menu_ticked(MenuItem::Numbers));
     // Rows that open a screen aren't settings, so nothing is in force.
@@ -190,36 +183,38 @@ fn a_fresh_install_types_the_built_in_words() {
 #[test]
 fn a_stored_duration_is_used_at_startup() {
     let mut settings = Settings::detached();
-    settings.set_duration(60);
+    settings.set_length(Length::Time(60));
     let app = App::build(
         Records::default(),
         History::default(),
+        Keys::default(),
         Wordlist::detached(),
         Banner::detached(),
         settings,
         Themes::detached(),
     );
 
-    assert_eq!(app.duration(), Duration::from_secs(60));
+    assert_eq!(app.length(), Length::Time(60));
     // The menu opens on it, rather than on the default.
-    assert_eq!(MENU[app.duration_index()], MenuItem::Duration(60));
+    assert_eq!(MENU[app.length_index()], MenuItem::Length(Length::Time(60)));
 }
 
 #[test]
 fn a_duration_the_menu_cant_show_falls_back_to_the_default() {
     // Someone hand-edited settings.tsv to a length with no menu row.
     let mut settings = Settings::detached();
-    settings.set_duration(45);
+    settings.set_length(Length::Time(45));
     let app = App::build(
         Records::default(),
         History::default(),
+        Keys::default(),
         Wordlist::detached(),
         Banner::detached(),
         settings,
         Themes::detached(),
     );
 
-    assert_eq!(app.duration(), Duration::from_secs(DEFAULT_DURATION));
+    assert_eq!(app.length(), DEFAULT_LENGTH);
 }
 
 #[test]
@@ -229,7 +224,7 @@ fn the_countdown_follows_the_chosen_duration() {
     app.menu_index = 2; // 60 seconds
     app.menu_select();
 
-    assert_eq!(app.remaining(), Duration::from_secs(60));
+    assert_eq!(app.remaining(), Some(Duration::from_secs(60)));
 }
 
 #[test]
@@ -395,7 +390,7 @@ fn a_restart_keeps_the_chosen_duration() {
     app.menu_select();
     app.restart();
 
-    assert_eq!(app.duration(), Duration::from_secs(15));
+    assert_eq!(app.length(), Length::Time(15));
 }
 
 // -- code -------------------------------------------------------------
@@ -479,8 +474,8 @@ fn asking_for_punctuation_asks_for_the_test_that_can_have_it() {
     assert_eq!(
         app.mode(),
         Mode::Words(Modifiers {
-            punctuation: false,
-            numbers: true
+            numbers: true,
+            ..Modifiers::default()
         })
     );
     assert!(!app.menu_ticked(MenuItem::Code));

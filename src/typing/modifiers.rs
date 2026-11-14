@@ -7,6 +7,8 @@
 
 use rand::RngExt;
 
+use super::length::Length;
+
 /// Roughly one word in this many gets punctuation attached.
 const PUNCTUATED: u32 = 4;
 /// Roughly one word in this many is replaced by a number.
@@ -35,6 +37,11 @@ const COMMON: u32 = 6;
 pub struct Modifiers {
     pub punctuation: bool,
     pub numbers: bool,
+    /// Lean the draw towards words holding your weakest keys. Unlike the other
+    /// two this changes which words are dealt rather than what is done to
+    /// them, so it is acted on by [`crate::typing::wordlist::Wordlist::deal`]
+    /// and has no part in [`Modifiers::apply`].
+    pub practice: bool,
 }
 
 impl Modifiers {
@@ -45,8 +52,12 @@ impl Modifiers {
     /// the plain one and losing. Reached through
     /// [`crate::typing::mode::Mode::key`], which is what knows whether the
     /// word test is the one being typed at all.
-    pub(super) fn key(self, seconds: u64) -> String {
-        let mut key = seconds.to_string();
+    ///
+    /// A practice run keeps its own too: it is dealt the words you find
+    /// hardest, on purpose, and scoring it against a plain test would make
+    /// every session of practice look like a bad day.
+    pub(super) fn key(self, length: Length) -> String {
+        let mut key = length.slug();
 
         if self.punctuation {
             key.push_str("+p");
@@ -54,18 +65,25 @@ impl Modifiers {
         if self.numbers {
             key.push_str("+n");
         }
+        if self.practice {
+            key.push_str("+k");
+        }
 
         key
     }
 
     /// What to call this setting on screen.
     pub fn label(self) -> Option<String> {
-        match (self.punctuation, self.numbers) {
-            (false, false) => None,
-            (true, false) => Some("punctuation".to_string()),
-            (false, true) => Some("numbers".to_string()),
-            (true, true) => Some("punctuation + numbers".to_string()),
-        }
+        let on: Vec<&str> = [
+            (self.punctuation, "punctuation"),
+            (self.numbers, "numbers"),
+            (self.practice, "practice"),
+        ]
+        .into_iter()
+        .filter_map(|(on, name)| on.then_some(name))
+        .collect();
+
+        (!on.is_empty()).then(|| on.join(" + "))
     }
 
     /// Rewrite a dealt list in place.
@@ -179,10 +197,12 @@ mod tests {
     const PLAIN: Modifiers = Modifiers {
         punctuation: false,
         numbers: false,
+        practice: false,
     };
     const BOTH: Modifiers = Modifiers {
         punctuation: true,
         numbers: true,
+        practice: false,
     };
 
     #[test]
@@ -198,30 +218,42 @@ mod tests {
     #[test]
     fn a_record_at_the_plain_setting_keeps_the_bare_number() {
         // Which is what every records file written before this existed holds.
-        assert_eq!(PLAIN.key(30), "30");
+        assert_eq!(PLAIN.key(30.into()), "30");
     }
 
     #[test]
     fn each_setting_keeps_its_own_record() {
         let punctuation = Modifiers {
             punctuation: true,
-            numbers: false,
+            ..PLAIN
         };
         let numbers = Modifiers {
-            punctuation: false,
             numbers: true,
+            ..PLAIN
+        };
+        let practice = Modifiers {
+            practice: true,
+            ..BOTH
         };
 
-        assert_eq!(punctuation.key(30), "30+p");
-        assert_eq!(numbers.key(30), "30+n");
-        assert_eq!(BOTH.key(30), "30+p+n");
-        assert_eq!(BOTH.key(15), "15+p+n");
+        assert_eq!(punctuation.key(30.into()), "30+p");
+        assert_eq!(numbers.key(30.into()), "30+n");
+        assert_eq!(BOTH.key(30.into()), "30+p+n");
+        assert_eq!(BOTH.key(15.into()), "15+p+n");
+        assert_eq!(practice.key(30.into()), "30+p+n+k");
+        assert_eq!(BOTH.key(Length::Words(25)), "w25+p+n");
     }
 
     #[test]
     fn only_a_setting_that_is_on_has_a_label() {
         assert_eq!(PLAIN.label(), None);
         assert_eq!(BOTH.label().unwrap(), "punctuation + numbers");
+
+        let practice = Modifiers {
+            practice: true,
+            ..PLAIN
+        };
+        assert_eq!(practice.label().unwrap(), "practice");
     }
 
     #[test]

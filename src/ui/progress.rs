@@ -33,7 +33,7 @@ const TOO_FEW: &str = "not enough runs at this length yet";
 /// time you changed the setting, and call that improvement.
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
-    let seconds = app.duration().as_secs();
+    let length = app.length().short();
     let key = app.record_key();
 
     let [plot_area, caption_area] =
@@ -51,7 +51,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .style(Style::default().fg(theme.dim));
 
         frame.render_widget(note, plot_area);
-        frame.render_widget(caption(seconds, theme), caption_area);
+        frame.render_widget(caption(&length, theme), caption_area);
         return;
     }
 
@@ -112,7 +112,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         );
 
     frame.render_widget(chart, plot_area);
-    frame.render_widget(caption(seconds, theme), caption_area);
+    frame.render_widget(caption(&length, theme), caption_area);
 }
 
 /// Points for one line, `x` counting runs from `first` as a 1-based number.
@@ -151,7 +151,7 @@ fn run_ticks(from: f64, to: f64) -> Vec<Line<'static>> {
 ///
 /// The length is named here rather than in the panel's heading because the
 /// table above it covers every length, and only the plot is about one.
-fn caption(seconds: u64, theme: &Theme) -> Paragraph<'static> {
+fn caption(length: &str, theme: &Theme) -> Paragraph<'static> {
     let key = |mark: &'static str, label: String, colour| {
         [
             Span::styled(mark, Style::default().fg(colour)),
@@ -164,7 +164,7 @@ fn caption(seconds: u64, theme: &Theme) -> Paragraph<'static> {
     // A separator between the keys rather than after each, so the line has no
     // trailing blanks to throw the centring off.
     let spans: Vec<Span> = [
-        key("──", format!("{seconds}s runs"), theme.muted).to_vec(),
+        key("──", format!("{length} runs"), theme.muted).to_vec(),
         vec![gap()],
         key("──", format!("{}-run trend", history::WINDOW), theme.accent).to_vec(),
         vec![gap()],

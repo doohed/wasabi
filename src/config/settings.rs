@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::config::storage;
+use crate::typing::length::Length;
 use crate::typing::mode::{Language, Mode};
 use crate::typing::modifiers::Modifiers;
 
@@ -11,6 +12,8 @@ const DURATION: &str = "duration";
 const BANNER: &str = "banner";
 const PUNCTUATION: &str = "punctuation";
 const NUMBERS: &str = "numbers";
+const PRACTICE: &str = "practice";
+const PACE: &str = "pace";
 const CODE: &str = "code";
 
 /// Persisted preferences.
@@ -60,18 +63,31 @@ impl Settings {
         self.save();
     }
 
-    /// The stored test length in seconds, if there is a usable one.
+    /// The stored test length, if there is a usable one.
     ///
     /// `Option` rather than a default: which lengths are legal is the app's
     /// business, not this file's, so the caller decides what to do with a
     /// missing or unparseable value.
-    pub fn duration(&self) -> Option<u64> {
-        self.values.get(DURATION)?.parse().ok()
+    ///
+    /// Still under the `duration` key, which a timed test's bare number keeps
+    /// reading as it always did — see [`Length::slug`].
+    pub fn length(&self) -> Option<Length> {
+        Length::from_slug(self.values.get(DURATION)?)
     }
 
-    pub fn set_duration(&mut self, seconds: u64) {
-        self.values
-            .insert(DURATION.to_string(), seconds.to_string());
+    pub fn set_length(&mut self, length: Length) {
+        self.values.insert(DURATION.to_string(), length.slug());
+        self.save();
+    }
+
+    /// Whether the pace caret is drawn. Off unless turned on: a second caret
+    /// is a distraction until you have asked for it.
+    pub fn pace_shown(&self) -> bool {
+        self.flag(PACE)
+    }
+
+    pub fn set_pace_shown(&mut self, shown: bool) {
+        self.set_flag(PACE, shown);
         self.save();
     }
 
@@ -100,12 +116,14 @@ impl Settings {
         Modifiers {
             punctuation: self.flag(PUNCTUATION),
             numbers: self.flag(NUMBERS),
+            practice: self.flag(PRACTICE),
         }
     }
 
     pub fn set_modifiers(&mut self, modifiers: Modifiers) {
         self.set_flag(PUNCTUATION, modifiers.punctuation);
         self.set_flag(NUMBERS, modifiers.numbers);
+        self.set_flag(PRACTICE, modifiers.practice);
         self.save();
     }
 
@@ -200,22 +218,54 @@ mod tests {
     }
 
     #[test]
-    fn a_duration_reads_back_after_being_set() {
+    fn a_length_reads_back_after_being_set() {
         let mut settings = Settings::detached();
-        assert_eq!(settings.duration(), None);
+        assert_eq!(settings.length(), None);
 
-        settings.set_duration(15);
-        assert_eq!(settings.duration(), Some(15));
+        settings.set_length(Length::Time(15));
+        assert_eq!(settings.length(), Some(Length::Time(15)));
+
+        settings.set_length(Length::Words(50));
+        assert_eq!(settings.length(), Some(Length::Words(50)));
     }
 
     #[test]
-    fn a_duration_that_isnt_a_number_reads_as_absent() {
+    fn a_timed_length_is_stored_as_the_bare_number_it_always_was() {
+        let mut settings = Settings::detached();
+        settings.set_length(Length::Time(60));
+
+        assert_eq!(settings.values[DURATION], "60");
+    }
+
+    #[test]
+    fn a_length_that_isnt_one_reads_as_absent() {
         let mut settings = Settings::detached();
         settings
             .values
             .insert(DURATION.to_string(), "ages".to_string());
 
-        assert_eq!(settings.duration(), None);
+        assert_eq!(settings.length(), None);
+    }
+
+    #[test]
+    fn the_pace_caret_is_off_until_turned_on() {
+        let mut settings = Settings::detached();
+        assert!(!settings.pace_shown());
+
+        settings.set_pace_shown(true);
+        assert!(settings.pace_shown());
+    }
+
+    #[test]
+    fn practice_reads_back_after_being_set() {
+        let mut settings = Settings::detached();
+        settings.set_modifiers(Modifiers {
+            practice: true,
+            ..Modifiers::default()
+        });
+
+        assert!(settings.modifiers().practice);
+        assert!(!settings.modifiers().punctuation);
     }
 
     #[test]

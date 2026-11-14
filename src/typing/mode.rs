@@ -5,6 +5,7 @@
 //! say over a snippet that was written with its own. An enum rather than a set
 //! of flags, so "punctuated code" can't be represented, let alone recorded.
 
+use super::length::Length;
 use super::modifiers::Modifiers;
 
 /// How the scores in the records and history files were worked out.
@@ -72,10 +73,14 @@ impl Mode {
     /// a page of common words. The plain word test's key is the bare number,
     /// which is what every records file written before any of this existed
     /// already contains.
-    pub fn key(self, seconds: u64) -> String {
+    ///
+    /// Takes anything that is a [`Length`], and a bare number of seconds is
+    /// one — which is every key there was before word tests.
+    pub fn key(self, length: impl Into<Length>) -> String {
+        let length = length.into();
         let test = match self {
-            Mode::Words(modifiers) => modifiers.key(seconds),
-            Mode::Code(language) => format!("{seconds}+code:{}", language.slug()),
+            Mode::Words(modifiers) => modifiers.key(length),
+            Mode::Code(language) => format!("{}+code:{}", length.slug(), language.slug()),
         };
 
         format!("v{SCORING}:{test}")
@@ -147,6 +152,7 @@ mod tests {
 
         assert_eq!(mode.key(30), "v2:30+code:rust");
         assert_eq!(Mode::Code(Language::C).key(15), "v2:15+code:c");
+        assert_eq!(mode.key(Length::Words(50)), "v2:w50+code:rust");
         assert_eq!(mode.label().unwrap(), "Rust code");
     }
 
@@ -154,7 +160,7 @@ mod tests {
     fn the_word_settings_dont_apply_to_code() {
         let punctuated = Mode::Words(Modifiers {
             punctuation: true,
-            numbers: false,
+            ..Modifiers::default()
         });
 
         assert!(punctuated.modifiers().unwrap().punctuation);

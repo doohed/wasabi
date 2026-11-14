@@ -24,7 +24,7 @@ fn finishing_a_test_files_a_record() {
 #[test]
 fn a_test_nobody_typed_is_not_a_record() {
     let mut app = app(&["cat"]);
-    app.started_at = Some(Instant::now() - app.duration());
+    app.started_at = Some(Instant::now() - limit(&app));
     app.tick();
 
     assert!(app.is_over());
@@ -81,7 +81,7 @@ fn the_history_keeps_the_runs_that_weren_t_bests() {
 #[test]
 fn a_test_nobody_typed_is_not_in_the_history() {
     let mut app = app(&["cat"]);
-    app.started_at = Some(Instant::now() - app.duration());
+    app.started_at = Some(Instant::now() - limit(&app));
     app.tick();
 
     assert!(history(&app, &key(Mode::default(), 30)).is_empty());
@@ -118,6 +118,6 @@ fn a_slower_run_doesnt_clear_the_new_best_flag_of_its_own_run() {
 #[test]
 fn remaining_never_goes_negative() {
     let mut app = app(&["cat"]);
-    app.started_at = Some(Instant::now() - app.duration() * 2);
-    assert_eq!(app.remaining(), Duration::ZERO);
+    app.started_at = Some(Instant::now() - limit(&app) * 2);
+    assert_eq!(app.remaining(), Some(Duration::ZERO));
 }

@@ -9,6 +9,7 @@
 use std::path::{Path, PathBuf};
 
 use rand::seq::IndexedRandom;
+use rand::RngExt;
 
 use crate::config::storage;
 use crate::typing::modifiers::Modifiers;
@@ -25,6 +26,16 @@ const FILE: &str = "words.txt";
 /// Five words a second is 300 wpm — comfortably faster than anyone types — so
 /// the timer is what ends a test, never the word list running dry.
 pub const WORDS_PER_SECOND: usize = 5;
+
+/// In a practice run, how many draws in [`FOCUS_OUT_OF`] come from the words
+/// holding a weak key.
+///
+/// Not every one: a test made only of words with a `v` in them is a drill
+/// nobody finishes, and the ordinary words between them are what keep it a
+/// typing test. Three in four is enough to meet each weak key many times a
+/// minute.
+const FOCUS_SHARE: u32 = 3;
+const FOCUS_OUT_OF: u32 = 4;
 
 /// The words a test can draw on.
 pub struct Wordlist {
@@ -91,7 +102,13 @@ impl Wordlist {
         self.path.as_deref()
     }
 
-    /// A test's worth of words for a run of `seconds`, modifiers applied.
+    /// Whether any word in the pool holds `key`, ignoring case — which is
+    /// what decides whether a weak key is one the pool can help you practise.
+    pub fn has(&self, key: char) -> bool {
+        self.words.iter().any(|word| holds(word, &[key]))
+    }
+
+    /// `count` words, modifiers applied.
     ///
     /// Drawn with repetition on purpose: sampling without it would bias the
     /// tail of a long test towards the rare, awkward words once the common
@@ -101,17 +118,32 @@ impl Wordlist {
     /// the test rather than as a word to type, so a draw that matches it is
     /// drawn again. Only when the pool has another word to give, or a pool of
     /// one word would never deal.
-    pub fn deal(&self, seconds: u64, modifiers: Modifiers) -> Vec<Word> {
+    ///
+    /// `focus` is the keys a practice run is drilling: most draws then come
+    /// from the words holding one of them. Ignored when it is empty or the
+    /// pool has no such word, which leaves an ordinary test rather than none.
+    pub fn deal(&self, count: usize, modifiers: Modifiers, focus: &[char]) -> Vec<Word> {
         let mut rng = rand::rng();
-        let count = seconds as usize * WORDS_PER_SECOND;
         let varied = self.words.iter().any(|word| *word != self.words[0]);
+
+        let focused: Vec<&String> = if modifiers.practice && !focus.is_empty() {
+            self.words
+                .iter()
+                .filter(|word| holds(word, focus))
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         let mut words: Vec<String> = Vec::with_capacity(count);
         while words.len() < count {
-            let word = self
-                .words
-                .choose(&mut rng)
-                .expect("a wordlist is never empty");
+            let word = if !focused.is_empty() && rng.random_ratio(FOCUS_SHARE, FOCUS_OUT_OF) {
+                *focused.choose(&mut rng).expect("checked non-empty")
+            } else {
+                self.words
+                    .choose(&mut rng)
+                    .expect("a wordlist is never empty")
+            };
 
             if varied && words.last() == Some(word) {
                 continue;
@@ -163,6 +195,17 @@ impl Wordlist {
         self.custom = false;
         Ok(())
     }
+}
+
+/// Whether `word` holds any of `keys`, ignoring case.
+///
+/// Case is ignored because the weak key may have been an upper-case letter met
+/// at the start of a punctuated sentence — the finger is the same one.
+fn holds(word: &str, keys: &[char]) -> bool {
+    word.chars().any(|c| {
+        keys.iter()
+            .any(|key| c == *key || c.to_lowercase().eq(key.to_lowercase()))
+    })
 }
 
 fn words_path() -> Option<PathBuf> {
@@ -229,14 +272,14 @@ mod tests {
 
     #[test]
     fn a_test_is_five_words_a_second() {
-        let words = wordlist(&["cat"]).deal(30, Modifiers::default());
+        let words = wordlist(&["cat"]).deal(30 * WORDS_PER_SECOND, Modifiers::default(), &[]);
         assert_eq!(words.len(), 30 * WORDS_PER_SECOND);
     }
 
     #[test]
     fn a_one_word_pool_still_deals_a_full_test() {
         // Drawn with repetition, so a pool shorter than the test is fine.
-        let words = wordlist(&["cat"]).deal(15, Modifiers::default());
+        let words = wordlist(&["cat"]).deal(15 * WORDS_PER_SECOND, Modifiers::default(), &[]);
 
         assert_eq!(words.len(), 15 * WORDS_PER_SECOND);
         assert!(words.iter().all(|word| word.target == "cat"));
@@ -245,9 +288,65 @@ mod tests {
     #[test]
     fn the_same_word_is_never_dealt_twice_in_a_row() {
         // Two words, so a repeat would turn up within a few draws if allowed.
-        let words = wordlist(&["cat", "dog"]).deal(60, Modifiers::default());
+        let words = wordlist(&["cat", "dog"]).deal(300, Modifiers::default(), &[]);
 
-        assert!(words.windows(2).all(|pair| pair[0].target != pair[1].target));
+        assert!(words
+            .windows(2)
+            .all(|pair| pair[0].target != pair[1].target));
+    }
+
+    const PRACTICE: Modifiers = Modifiers {
+        punctuation: false,
+        numbers: false,
+        practice: true,
+    };
+
+    /// How many of `words` hold a `v`.
+    fn with_v(words: &[Word]) -> usize {
+        words
+            .iter()
+            .filter(|word| word.target.contains('v'))
+            .count()
+    }
+
+    #[test]
+    fn practice_leans_the_draw_towards_the_weak_keys() {
+        // Three words in ten hold a `v`, so a plain draw gets about that.
+        // Several of them, as in a real pool: a lone `v` word is held back by
+        // the no-repeat rule, whatever the practice setting asks for.
+        let pool = wordlist(&["a", "b", "c", "d", "e", "f", "g", "vat", "van", "eve"]);
+
+        let plain = with_v(&pool.deal(1000, Modifiers::default(), &['v']));
+        let practice = with_v(&pool.deal(1000, PRACTICE, &['v']));
+
+        assert!(plain < 400, "{plain}");
+        assert!(practice > 700, "{practice}");
+        // And never all of them, or it would be a drill rather than a test.
+        assert!(practice < 1000, "{practice}");
+    }
+
+    #[test]
+    fn practice_with_no_weak_keys_is_an_ordinary_test() {
+        let words = wordlist(&["cat", "dog"]).deal(50, PRACTICE, &[]);
+        assert_eq!(words.len(), 50);
+    }
+
+    #[test]
+    fn a_weak_key_no_word_holds_is_ignored() {
+        let words = wordlist(&["cat", "dog"]).deal(50, PRACTICE, &['z']);
+
+        assert_eq!(words.len(), 50);
+        assert!(words.iter().all(|word| word.target != "z"));
+    }
+
+    #[test]
+    fn the_pool_knows_which_keys_it_can_practise() {
+        let pool = wordlist(&["Cat", "dog"]);
+
+        assert!(pool.has('c'), "case is ignored");
+        assert!(pool.has('C'));
+        assert!(pool.has('g'));
+        assert!(!pool.has('z'));
     }
 
     #[test]

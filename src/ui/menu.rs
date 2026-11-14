@@ -13,11 +13,15 @@ pub const HEIGHT: u16 = MENU.len() as u16 + 3;
 
 fn label(item: MenuItem) -> String {
     match item {
-        MenuItem::Duration(seconds) => format!("{seconds} seconds"),
-        MenuItem::Words => "words".to_string(),
+        MenuItem::Length(length) => length.label(),
+        // Not "words": that would sit under "100 words" and read as a fourth
+        // length rather than a way into the pool they are drawn from.
+        MenuItem::Words => "word list".to_string(),
         MenuItem::Code => "code".to_string(),
         MenuItem::Punctuation => "punctuation".to_string(),
         MenuItem::Numbers => "numbers".to_string(),
+        MenuItem::Practice => "practice".to_string(),
+        MenuItem::Pace => "pace caret".to_string(),
         MenuItem::Banner => "banner".to_string(),
         MenuItem::Theme => "theme".to_string(),
         MenuItem::Records => "records".to_string(),

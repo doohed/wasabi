@@ -21,6 +21,13 @@ pub fn wpm(chars: usize, seconds: f64) -> f64 {
     (chars as f64 / CHARS_PER_WORD) / (seconds / 60.0)
 }
 
+/// Characters typed in `seconds` at `wpm` — [`wpm`] run backwards.
+///
+/// What the pace caret uses to turn a personal best into a place in the text.
+pub fn chars(wpm: f64, seconds: f64) -> f64 {
+    wpm * CHARS_PER_WORD * seconds / 60.0
+}
+
 /// One reading, covering roughly a second of a run.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sample {
@@ -220,6 +227,12 @@ mod tests {
     fn five_characters_a_second_is_sixty_wpm() {
         assert_eq!(wpm(5, 1.0), 60.0);
         assert_eq!(wpm(50, 60.0), 10.0);
+    }
+
+    #[test]
+    fn chars_undoes_wpm() {
+        assert_eq!(chars(60.0, 1.0), 5.0);
+        assert_eq!(wpm(chars(90.0, 30.0) as usize, 30.0), 90.0);
     }
 
     #[test]

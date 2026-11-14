@@ -12,6 +12,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod history;
+pub mod keys;
 pub mod records;
 
 /// Now, in unix seconds.
