@@ -1,23 +1,34 @@
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
+use super::kit;
 use crate::app::{code_rows, App};
 use crate::typing::mode::Language;
 
 /// Width of the picker, in columns.
-pub const WIDTH: u16 = 34;
-/// One row per choice, plus the heading, a row of padding each side, and the
-/// note under the list.
-pub const HEIGHT: u16 = Language::ALL.len() as u16 + 6;
+pub const WIDTH: u16 = 40;
+/// Columns the rows span, inside the margins.
+const ROW: usize = kit::content(WIDTH);
+/// The heading, one row per choice, a blank and the note under the list, the
+/// panel's title, and a row of padding each side.
+pub const HEIGHT: u16 = (Language::ALL.len() + 1) as u16 + 3 + 3;
 
 /// What a row offers. `None` is the word test — the way back out.
 fn label(choice: Option<Language>) -> String {
     match choice {
-        None => "off — type words".to_string(),
-        Some(language) => format!("{} code", language.name()),
+        None => "off".to_string(),
+        Some(language) => language.name().to_string(),
+    }
+}
+
+/// A word on what each row deals, beside the radio button.
+fn detail(choice: Option<Language>) -> String {
+    match choice {
+        None => "back to words".to_string(),
+        Some(language) => format!("{} snippets", language.name()),
     }
 }
 
@@ -30,36 +41,28 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
     let chosen = app.mode().language();
 
-    let mut lines: Vec<Line> = code_rows()
-        .iter()
-        .enumerate()
-        .map(|(index, choice)| {
-            let highlighted = index == app.menu_index;
+    let mut lines = vec![kit::heading("language", ROW, theme)];
 
-            let mut style = Style::default().fg(theme.muted);
-            if highlighted {
-                style = style.add_modifier(Modifier::REVERSED);
-            }
+    lines.extend(code_rows().iter().enumerate().map(|(index, choice)| {
+        let highlighted = index == app.menu_index;
 
-            // The tick marks what is in force, which is not necessarily the
-            // row under the cursor.
-            let tick = if *choice == chosen { " ✓" } else { "" };
+        let mut left = kit::bar(highlighted, theme);
+        left.push(Span::styled(
+            format!("{:<10}", label(*choice)),
+            kit::name(highlighted, theme),
+        ));
+        left.push(Span::styled(
+            detail(*choice),
+            Style::default().fg(theme.dim),
+        ));
 
-            Line::from(vec![
-                Span::raw(if highlighted { " › " } else { "   " }),
-                Span::styled(format!(" {:<16}", label(*choice)), style),
-                Span::styled(tick, Style::default().fg(theme.accent)),
-            ])
-        })
-        .collect();
+        // The dot marks what is in force, which is not necessarily the row
+        // under the cursor.
+        kit::spread(left, vec![kit::radio(*choice == chosen, theme)], ROW)
+    }));
 
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "   indentation is typed for you",
-        Style::default()
-            .fg(theme.dim)
-            .add_modifier(Modifier::ITALIC),
-    )));
+    lines.push(kit::note("indentation is typed for you", theme));
 
     let panel = Paragraph::new(lines).block(super::panel(" code ", theme));
 

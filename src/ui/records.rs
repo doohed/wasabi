@@ -1,24 +1,27 @@
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
-use super::progress;
+use super::{kit, progress};
 use crate::app::{App, LENGTHS};
+use crate::config::theme::Theme;
 use crate::scores::records;
 
 /// Width of the records box, in columns.
-pub const WIDTH: u16 = 48;
+pub const WIDTH: u16 = 54;
+/// Columns the rows span, inside the margins.
+const ROW: usize = kit::content(WIDTH);
 
-/// Content rows: the column headings, the blank under them, and one row per
+/// Content rows: the column headings, the rule under them, and one row per
 /// length. Derived rather than written out, so adding a length can't
 /// silently clip the last row off the bottom.
 const ROWS: u16 = LENGTHS.len() as u16 + 2;
 /// The table, plus a row of padding top and bottom, plus the heading.
 pub const TABLE_HEIGHT: u16 = ROWS + 3;
 
-/// Rows the progress plot gets: a blank to separate it from the table, the
+/// Rows the progress plot gets: a heading to separate it from the table, the
 /// plot itself, and its caption.
 ///
 /// The plot is the same height as the one on the results screen. Everyone's
@@ -48,8 +51,22 @@ pub fn size(area: Rect, app: &App) -> (u16, u16) {
 /// where a zero would read as a score of zero.
 const NONE: &str = "—";
 
-fn row(test: &str, best: &str, accuracy: &str, runs: &str, last: &str) -> String {
-    format!("{test:>5}  {best:>8}  {accuracy:>8}  {runs:>5}   {last:<10}")
+/// The table's columns, right-aligned so the numbers line up.
+const COLUMNS: [usize; 5] = [5, 9, 10, 6, 4];
+
+/// One row of the table: a cell per column, each in its own style.
+fn row(cells: [(String, Style); 5], highlighted: bool, theme: &Theme) -> Line<'static> {
+    let mut spans = kit::bar(highlighted, theme);
+    for (index, ((text, style), width)) in cells.into_iter().zip(COLUMNS).enumerate() {
+        // The last column is a phrase, not a number: it reads from the left.
+        let cell = if index == COLUMNS.len() - 1 {
+            format!("    {text}")
+        } else {
+            format!("{text:>width$}")
+        };
+        spans.push(Span::styled(cell, style));
+    }
+    Line::from(spans)
 }
 
 /// Personal bests, one row per test length, and progress at the length the
@@ -57,13 +74,18 @@ fn row(test: &str, best: &str, accuracy: &str, runs: &str, last: &str) -> String
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
     let records = app.records();
+    let dim = Style::default().fg(theme.dim);
 
     let mut lines = vec![
-        Line::from(Span::styled(
-            row("test", "best", "accuracy", "runs", "set"),
-            Style::default().fg(theme.dim),
-        )),
-        Line::from(""),
+        row(
+            ["test", "best", "accuracy", "runs", "set"].map(|h| (h.to_string(), dim)),
+            false,
+            theme,
+        ),
+        Line::from(vec![
+            Span::raw(" ".repeat(kit::MARGIN)),
+            Span::styled("─".repeat(ROW), dim),
+        ]),
     ];
 
     // Every length, at the setting in force: the table is about how long you
@@ -72,28 +94,39 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     for length in LENGTHS {
         let key = mode.key(length);
-        let name = length.short();
+        // The bar marks the length the test is set to — the one the plot
+        // below is about.
+        let highlighted = length == app.length();
+        let name = (length.short(), kit::name(highlighted, theme));
         let runs = records.runs(&key);
 
-        let line = match records.best(&key) {
-            Some(best) => Line::from(Span::styled(
-                row(
-                    &name,
-                    &format!("{:.0} wpm", best.wpm),
-                    &format!("{:.0}%", best.accuracy),
-                    &runs.to_string(),
-                    &records::age(best.at),
+        let cells = match records.best(&key) {
+            Some(best) => [
+                name,
+                (
+                    format!("{:.0} wpm", best.wpm),
+                    Style::default()
+                        .fg(theme.accent)
+                        .add_modifier(Modifier::BOLD),
                 ),
-                Style::default().fg(theme.accent),
-            )),
+                (
+                    format!("{:.0}%", best.accuracy),
+                    Style::default().fg(theme.text),
+                ),
+                (runs.to_string(), Style::default().fg(theme.muted)),
+                (records::age(best.at), dim),
+            ],
             // Never attempted: dashes rather than zeroes.
-            None => Line::from(Span::styled(
-                row(&name, NONE, NONE, "0", NONE),
-                Style::default().fg(theme.dim),
-            )),
+            None => [
+                name,
+                (NONE.to_string(), dim),
+                (NONE.to_string(), dim),
+                ("0".to_string(), dim),
+                (NONE.to_string(), dim),
+            ],
         };
 
-        lines.push(line);
+        lines.push(row(cells, highlighted, theme));
     }
 
     let title = match mode.label() {
@@ -114,8 +147,16 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     frame.render_widget(table, table_area);
 
-    // One row down, so the plot isn't touching the table above it.
-    let [_, plot_area] =
+    // A heading between the two, so the plot isn't touching the table.
+    let [heading_area, plot_area] =
         Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(plot_area);
+    frame.render_widget(
+        Paragraph::new(kit::heading(
+            &format!("progress · {}", app.length().short()),
+            ROW,
+            theme,
+        )),
+        heading_area,
+    );
     progress::render(frame, plot_area, app);
 }

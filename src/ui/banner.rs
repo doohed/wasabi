@@ -1,36 +1,20 @@
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
+use super::kit;
 use crate::app::App;
 use crate::config::storage;
-use crate::config::theme::Theme;
 
 /// Width of the banner box, in columns.
 pub const WIDTH: u16 = 60;
-/// Eleven content rows, plus the heading and a row of padding each side.
-pub const HEIGHT: u16 = 14;
-
-const LABEL_WIDTH: usize = 8;
-
-fn field(label: &str, value: String, colour: Color, theme: &Theme) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(
-            format!(" {label:<LABEL_WIDTH$}"),
-            Style::default().fg(theme.dim),
-        ),
-        Span::styled(value, Style::default().fg(colour)),
-    ])
-}
-
-fn key(key: &str, what: &str, theme: &Theme) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(format!(" {key}  "), Style::default().fg(theme.accent)),
-        Span::styled(what.to_string(), Style::default().fg(theme.muted)),
-    ])
-}
+/// Columns the rows span, inside the margins.
+const ROW: usize = kit::content(WIDTH);
+/// Two headings, five facts, four keys, a blank and the status line, plus
+/// the panel's title and a row of padding each side.
+pub const HEIGHT: u16 = 13 + 3;
 
 /// Where the art above the test comes from, and how to change it.
 ///
@@ -46,16 +30,17 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, screen_height: u16) {
         "the built-in art"
     };
 
-    // Off is the first thing to say: it explains every other row at once,
-    // rather than leaving someone to wonder why art that "fits" isn't there.
-    let (source, source_colour) = if app.banner_shown() {
-        (source.to_string(), theme.accent)
-    } else {
-        (
-            format!("off — {source} when you turn it back on"),
-            theme.dim,
-        )
-    };
+    // On or off first: it explains every other row at once, rather than
+    // leaving someone to wonder why art that "fits" isn't there.
+    let shown = kit::field(
+        "showing",
+        vec![
+            kit::switch(app.banner_shown(), theme),
+            Span::styled("  ·  ", Style::default().fg(theme.dim)),
+            Span::styled(source, Style::default().fg(theme.muted)),
+        ],
+        theme,
+    );
 
     let file = match banner.path() {
         Some(path) => storage::tilde(path),
@@ -94,37 +79,46 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, screen_height: u16) {
     // built-in sushi, to the sushi). Shown anyway, in the colour itself, so
     // someone looking for the old `c` key is told where it went instead of
     // finding nothing.
-    let label = Span::styled(
-        format!(" {:<LABEL_WIDTH$}", "colour"),
-        Style::default().fg(theme.dim),
-    );
     let colour = if banner.is_custom() {
-        Line::from(vec![
-            label,
-            Span::styled("████", Style::default().fg(theme.banner)),
-            Span::styled(
-                format!("  from the {} theme", theme.name),
-                Style::default().fg(theme.dim),
-            ),
-        ])
+        kit::field(
+            "colour",
+            vec![
+                Span::styled("████", Style::default().fg(theme.banner)),
+                Span::styled(
+                    format!("  from the {} theme", theme.name),
+                    Style::default().fg(theme.dim),
+                ),
+            ],
+            theme,
+        )
     } else {
-        Line::from(vec![
-            label,
-            Span::styled("██", Style::default().fg(super::art::SALMON)),
-            Span::styled("██", Style::default().fg(super::art::STRIPE)),
-            Span::styled("██", Style::default().fg(theme.text)),
-            Span::styled("  salmon on rice", Style::default().fg(theme.dim)),
-        ])
+        kit::field(
+            "colour",
+            vec![
+                Span::styled("██", Style::default().fg(super::art::SALMON)),
+                Span::styled("██", Style::default().fg(super::art::STRIPE)),
+                Span::styled("██", Style::default().fg(theme.text)),
+                Span::styled("  salmon on rice", Style::default().fg(theme.dim)),
+            ],
+            theme,
+        )
     };
 
-    let mut lines = vec![
-        field("showing", source, source_colour, theme),
-        field("file", file, theme.accent, theme),
-        field("size", size, size_colour, theme),
+    let file_colour = if banner.is_custom() {
+        theme.muted
+    } else {
+        theme.dim
+    };
+
+    let lines = vec![
+        kit::heading("art", ROW, theme),
+        shown,
+        kit::fact("file", file, file_colour, theme),
+        kit::fact("size", size, size_colour, theme),
         colour,
-        Line::from(""),
-        key("e", "edit it in $EDITOR", theme),
-        key(
+        kit::heading("keys", ROW, theme),
+        kit::key("e", "edit it in $EDITOR", theme),
+        kit::key(
             "b",
             if app.banner_shown() {
                 "turn it off, and centre the test"
@@ -133,19 +127,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, screen_height: u16) {
             },
             theme,
         ),
-        key("r", "reload it from disk", theme),
-        key("x", "remove it and use the built-in", theme),
+        kit::key("r", "reload it from disk", theme),
+        kit::key("x", "remove it and use the built-in", theme),
         Line::from(""),
+        kit::status(app.status(), theme),
     ];
-
-    if let Some(status) = app.status() {
-        lines.push(Line::from(Span::styled(
-            format!(" {status}"),
-            Style::default()
-                .fg(theme.muted)
-                .add_modifier(Modifier::ITALIC),
-        )));
-    }
 
     let panel = Paragraph::new(lines).block(super::panel(" banner ", theme));
 

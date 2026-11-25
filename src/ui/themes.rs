@@ -4,6 +4,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
+use super::kit;
 use crate::app::App;
 use crate::config::storage;
 use crate::config::theme::Theme;
@@ -26,9 +27,12 @@ const SWATCH_WIDTH: usize = 2;
 /// than their terminal.
 const MAX_ROWS: usize = 8;
 
-/// Rows below the list: a blank, two key hints, a blank, the file path, and
-/// the status line.
-const FOOTER_ROWS: u16 = 6;
+/// Columns the rows span, inside the margins.
+const ROW: usize = kit::content(WIDTH);
+
+/// Rows that aren't themes: the list's heading, then the keys' heading, two
+/// keys, the file, a blank and the status line.
+const CHROME_ROWS: u16 = 7;
 
 /// How many theme rows are on screen.
 fn visible(app: &App) -> usize {
@@ -37,8 +41,8 @@ fn visible(app: &App) -> usize {
 
 /// Height the picker needs, which depends on how many themes exist.
 pub fn height(app: &App) -> u16 {
-    // The rows, the footer, a row of padding top and bottom, and the border.
-    visible(app) as u16 + FOOTER_ROWS + 3
+    // The rows, the rest, then the title and a row of padding each side.
+    visible(app) as u16 + CHROME_ROWS + 3
 }
 
 /// First row to draw, so the selection is always on screen.
@@ -75,13 +79,6 @@ fn swatch(theme: &Theme) -> Vec<Span<'static>> {
     spans
 }
 
-fn key(key: &str, what: &str, theme: &Theme) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(format!(" {key}  "), Style::default().fg(theme.accent)),
-        Span::styled(what.to_string(), Style::default().fg(theme.muted)),
-    ])
-}
-
 /// The theme picker.
 ///
 /// The rest of the interface is already drawn in the highlighted theme — the
@@ -93,59 +90,54 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let visible = visible(app);
     let first = offset(selected, all.len(), visible);
 
-    let mut lines: Vec<Line> = all
-        .iter()
-        .enumerate()
-        .skip(first)
-        .take(visible)
-        .map(|(index, theme)| {
-            let highlighted = index == selected;
+    let mut lines = vec![kit::heading(
+        &format!("themes · {} of {}", selected + 1, all.len()),
+        ROW,
+        current,
+    )];
 
-            let mut label = Style::default().fg(current.muted);
-            if highlighted {
-                label = label.add_modifier(Modifier::REVERSED);
-            }
+    lines.extend(
+        all.iter()
+            .enumerate()
+            .skip(first)
+            .take(visible)
+            .map(|(index, theme)| {
+                let highlighted = index == selected;
 
-            let mut spans = vec![
-                Span::raw(if highlighted { " › " } else { "   " }),
-                Span::styled(format!(" {:<11}", theme.name), label),
-            ];
-            spans.push(Span::raw("  "));
-            spans.extend(swatch(theme));
-            // Marks a theme as one of the user's own, so it's obvious which
-            // rows come from their file.
-            if theme.custom {
-                spans.push(Span::styled("  ·", Style::default().fg(current.accent)));
-            }
+                let mut left = kit::bar(highlighted, current);
+                left.push(Span::styled(
+                    format!("{:<12}", theme.name),
+                    kit::name(highlighted, current),
+                ));
+                // Marks a theme as one of the user's own, so it's obvious
+                // which rows come from their file.
+                if theme.custom {
+                    left.push(Span::styled(
+                        "yours",
+                        Style::default()
+                            .fg(current.accent)
+                            .add_modifier(Modifier::ITALIC),
+                    ));
+                }
 
-            Line::from(spans)
-        })
-        .collect();
-
-    lines.push(Line::from(""));
-    lines.push(key("e", "edit your themes in $EDITOR", current));
-    lines.push(key("r", "reload them from disk", current));
-    lines.push(Line::from(""));
+                kit::spread(left, swatch(theme), ROW)
+            }),
+    );
 
     // Shown so that someone with no $EDITOR still knows which file to open.
-    lines.push(Line::from(Span::styled(
-        match app.themes().path() {
-            Some(path) => format!(" {}", storage::tilde(path)),
-            None => " nowhere to save themes (no $HOME)".to_string(),
-        },
-        Style::default().fg(current.dim),
-    )));
+    let file = match app.themes().path() {
+        Some(path) => storage::tilde(path),
+        None => "nowhere to save themes (no $HOME)".to_string(),
+    };
 
-    // Always a row, so the box doesn't change height when a message appears.
-    lines.push(match app.status() {
-        Some(status) => Line::from(Span::styled(
-            format!(" {status}"),
-            Style::default()
-                .fg(current.muted)
-                .add_modifier(Modifier::ITALIC),
-        )),
-        None => Line::from(""),
-    });
+    lines.extend([
+        kit::heading("keys", ROW, current),
+        kit::key("e", "edit your themes in $EDITOR", current),
+        kit::key("r", "reload them from disk", current),
+        kit::fact("file", file, current.dim, current),
+        Line::from(""),
+        kit::status(app.status(), current),
+    ]);
 
     frame.render_widget(
         Paragraph::new(lines).block(super::panel(" theme ", current)),

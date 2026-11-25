@@ -1,36 +1,19 @@
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
+use super::kit;
 use crate::app::App;
 use crate::config::storage;
-use crate::config::theme::Theme;
 
 /// Width of the words box, in columns.
 pub const WIDTH: u16 = 60;
-/// Ten content rows, plus the heading and a row of padding each side.
-pub const HEIGHT: u16 = 13;
-
-const LABEL_WIDTH: usize = 8;
-
-fn field(label: &str, value: String, colour: Color, theme: &Theme) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(
-            format!(" {label:<LABEL_WIDTH$}"),
-            Style::default().fg(theme.dim),
-        ),
-        Span::styled(value, Style::default().fg(colour)),
-    ])
-}
-
-fn key(key: &str, what: &str, theme: &Theme) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(format!(" {key}  "), Style::default().fg(theme.accent)),
-        Span::styled(what.to_string(), Style::default().fg(theme.muted)),
-    ])
-}
+/// Columns the rows span, inside the margins.
+const ROW: usize = kit::content(WIDTH);
+/// Two headings, four facts, three keys, a blank and the status line, plus
+/// the panel's title and a row of padding each side.
+pub const HEIGHT: u16 = 11 + 3;
 
 /// Where the test's words come from, and how to change them.
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
@@ -66,31 +49,30 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let applied = match app.mode().label() {
         Some(label) => (label, theme.accent),
         None => (
-            "none — the words exactly as the list has them".to_string(),
+            "none — the words as the list has them".to_string(),
             theme.dim,
         ),
     };
 
-    let mut lines = vec![
-        field("using", source.to_string(), theme.accent, theme),
-        field("file", file, theme.accent, theme),
-        field("words", count, count_colour, theme),
-        field("applied", applied.0, applied.1, theme),
-        Line::from(""),
-        key("e", "edit them in $EDITOR", theme),
-        key("r", "reload them from disk", theme),
-        key("x", "remove them and use the built-in list", theme),
-        Line::from(""),
-    ];
+    let (source_colour, file_colour) = if wordlist.is_custom() {
+        (theme.accent, theme.muted)
+    } else {
+        (theme.muted, theme.dim)
+    };
 
-    if let Some(status) = app.status() {
-        lines.push(Line::from(Span::styled(
-            format!(" {status}"),
-            Style::default()
-                .fg(theme.muted)
-                .add_modifier(Modifier::ITALIC),
-        )));
-    }
+    let lines = vec![
+        kit::heading("source", ROW, theme),
+        kit::fact("using", source, source_colour, theme),
+        kit::fact("file", file, file_colour, theme),
+        kit::fact("words", count, count_colour, theme),
+        kit::fact("applied", applied.0, applied.1, theme),
+        kit::heading("keys", ROW, theme),
+        kit::key("e", "edit them in $EDITOR", theme),
+        kit::key("r", "reload them from disk", theme),
+        kit::key("x", "remove them and use the built-in list", theme),
+        Line::from(""),
+        kit::status(app.status(), theme),
+    ];
 
     let panel = Paragraph::new(lines).block(super::panel(" words ", theme));
 

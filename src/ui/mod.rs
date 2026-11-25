@@ -4,6 +4,7 @@ mod code;
 mod footer;
 mod graph;
 mod header;
+mod kit;
 mod menu;
 mod progress;
 mod records;
