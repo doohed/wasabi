@@ -147,6 +147,21 @@ pub(super) fn built_ins() -> Vec<Theme> {
             banner: Color::Rgb(0, 255, 65),
             custom: false,
         },
+        // Black metal, after Venom: corpse-paint bone and ash on black, blood
+        // red for mistakes and the logo, hellfire for the rare good news.
+        Theme {
+            name: "venom".to_string(),
+            text: Color::Rgb(200, 194, 184),
+            muted: Color::Rgb(140, 134, 128),
+            dim: Color::Rgb(72, 68, 68),
+            error: Color::Rgb(204, 0, 0),
+            extra: Color::Rgb(255, 69, 58),
+            accent: Color::Rgb(255, 255, 255),
+            good: Color::Rgb(232, 170, 40),
+            warn: Color::Rgb(230, 110, 30),
+            banner: Color::Rgb(170, 0, 0),
+            custom: false,
+        },
     ]
 }
 
