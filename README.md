@@ -27,7 +27,8 @@ records stay). Or just `cargo run --release`.
 
 ## Settings
 
-Press `esc` for settings. Words, banner and themes can all be customised:
+Press `esc` for settings: `↑↓` moves, `←→` changes a value, `enter` starts
+the test. Words, banner and themes can all be customised:
 `e` edits the file in `$EDITOR`, `r` reloads it, `x` resets to the built-in
 (`b` toggles the banner).
 

@@ -15,7 +15,7 @@ fn the_menu_opens_on_the_duration_in_force() {
     app.open_menu();
 
     assert_eq!(app.screen, Screen::Menu);
-    assert_eq!(MENU[app.menu_index], MenuItem::Length(Length::Time(30)));
+    assert_eq!(MENU[app.menu_index], MenuItem::Time);
 }
 
 #[test]
@@ -60,9 +60,7 @@ fn choosing_a_duration_restarts_the_test() {
     let mut app = app(&["cat", "dog"]);
     type_str(&mut app, "cat ");
 
-    app.open_menu();
-    app.menu_index = 0; // 15 seconds
-    app.menu_select();
+    pick_length(&mut app, Length::Time(15));
 
     assert_eq!(app.length(), Length::Time(15));
     assert_eq!(app.screen, Screen::Test);
@@ -77,11 +75,107 @@ fn choosing_a_duration_restarts_the_test() {
 #[test]
 fn choosing_a_duration_remembers_it_for_next_time() {
     let mut app = app(&["cat"]);
-    app.open_menu();
-    app.menu_index = menu_row(MenuItem::Length(Length::Time(15)));
-    app.menu_select();
+    pick_length(&mut app, Length::Time(15));
 
     assert_eq!(app.settings.length(), Some(Length::Time(15)));
+}
+
+#[test]
+fn the_menu_is_its_sections_in_order() {
+    let flat: Vec<MenuItem> = SECTIONS
+        .iter()
+        .flat_map(|(_, items)| items.iter().copied())
+        .collect();
+
+    assert_eq!(flat, MENU);
+}
+
+#[test]
+fn arrows_step_across_a_length_row_and_wrap() {
+    let mut app = app(&["cat"]);
+    app.open_menu(); // on the time row, at 30
+
+    app.menu_adjust(1);
+    assert_eq!(app.length(), Length::Time(60));
+    app.menu_adjust(1);
+    assert_eq!(app.length(), Length::Time(15));
+    app.menu_adjust(-1);
+    assert_eq!(app.length(), Length::Time(60));
+
+    // Applied as it goes, and remembered, without leaving the menu.
+    assert_eq!(app.screen, Screen::Menu);
+    assert_eq!(app.settings.length(), Some(Length::Time(60)));
+}
+
+#[test]
+fn arrows_on_the_other_kind_of_length_start_at_its_ends() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Count);
+
+    app.menu_adjust(1);
+    assert_eq!(app.length(), Length::Words(25));
+
+    app.menu_index = menu_row(MenuItem::Time);
+    app.menu_adjust(-1);
+    assert_eq!(app.length(), Length::Time(60));
+}
+
+#[test]
+fn enter_on_the_other_kind_of_length_starts_its_middle_option() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Count);
+    app.menu_select();
+
+    assert_eq!(app.length(), Length::Words(50));
+    assert_eq!(app.screen, Screen::Test);
+}
+
+#[test]
+fn enter_on_the_length_in_force_keeps_it() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_select();
+
+    assert_eq!(app.length(), DEFAULT_LENGTH);
+    assert_eq!(app.screen, Screen::Test);
+}
+
+#[test]
+fn arrows_flip_a_switch_either_way() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Numbers);
+
+    app.menu_adjust(1);
+    assert!(app.menu_ticked(MenuItem::Numbers));
+    app.menu_adjust(-1);
+    assert!(!app.menu_ticked(MenuItem::Numbers));
+    assert_eq!(app.screen, Screen::Menu);
+}
+
+#[test]
+fn right_opens_a_screen_and_left_does_not() {
+    let mut app = app(&["cat"]);
+    app.open_menu();
+    app.menu_index = menu_row(MenuItem::Theme);
+
+    app.menu_adjust(-1);
+    assert_eq!(app.screen, Screen::Menu);
+    app.menu_adjust(1);
+    assert_eq!(app.screen, Screen::Theme);
+}
+
+#[test]
+fn word_modifiers_are_greyed_out_in_code_mode() {
+    let mut app = app(&["cat"]);
+    assert!(app.menu_live(MenuItem::Punctuation));
+
+    app.set_language(Some(Language::Rust));
+    assert!(!app.menu_live(MenuItem::Punctuation));
+    assert!(!app.menu_live(MenuItem::Practice));
+    assert!(app.menu_live(MenuItem::Pace));
 }
 
 // -- modifiers --------------------------------------------------------
@@ -128,8 +222,8 @@ fn the_menu_ticks_every_setting_in_force() {
     let mut app = app(&["cat"]);
     toggle(&mut app, MenuItem::Punctuation);
 
-    assert!(app.menu_ticked(MenuItem::Length(Length::Time(30))));
-    assert!(!app.menu_ticked(MenuItem::Length(Length::Time(15))));
+    assert!(app.menu_ticked(MenuItem::Time));
+    assert!(!app.menu_ticked(MenuItem::Count));
     assert!(app.menu_ticked(MenuItem::Punctuation));
     assert!(!app.menu_ticked(MenuItem::Numbers));
     // Rows that open a screen aren't settings, so nothing is in force.
@@ -196,7 +290,7 @@ fn a_stored_duration_is_used_at_startup() {
 
     assert_eq!(app.length(), Length::Time(60));
     // The menu opens on it, rather than on the default.
-    assert_eq!(MENU[app.length_index()], MenuItem::Length(Length::Time(60)));
+    assert_eq!(MENU[app.length_index()], MenuItem::Time);
 }
 
 #[test]
@@ -220,9 +314,7 @@ fn a_duration_the_menu_cant_show_falls_back_to_the_default() {
 #[test]
 fn the_countdown_follows_the_chosen_duration() {
     let mut app = app(&["cat"]);
-    app.open_menu();
-    app.menu_index = 2; // 60 seconds
-    app.menu_select();
+    pick_length(&mut app, Length::Time(60));
 
     assert_eq!(app.remaining(), Some(Duration::from_secs(60)));
 }
@@ -385,9 +477,7 @@ fn leaving_a_screen_never_quits() {
 #[test]
 fn a_restart_keeps_the_chosen_duration() {
     let mut app = app(&["cat"]);
-    app.open_menu();
-    app.menu_index = 0;
-    app.menu_select();
+    pick_length(&mut app, Length::Time(15));
     app.restart();
 
     assert_eq!(app.length(), Length::Time(15));

@@ -41,11 +41,12 @@ impl Length {
         }
     }
 
-    /// What the menu calls it.
-    pub fn label(self) -> String {
+    /// The bare number, for the menu: the row it sits on already says
+    /// whether it counts seconds or words.
+    pub fn number(self) -> String {
         match self {
-            Length::Time(seconds) => format!("{seconds} seconds"),
-            Length::Words(count) => format!("{count} words"),
+            Length::Time(seconds) => seconds.to_string(),
+            Length::Words(count) => count.to_string(),
         }
     }
 

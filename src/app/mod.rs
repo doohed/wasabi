@@ -60,8 +60,10 @@ pub enum EditTarget {
 /// A row of the menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuItem {
-    /// Switch the test to this length.
-    Length(Length),
+    /// A timed test: `←→` picks the clock from [`TIMES`].
+    Time,
+    /// A word-count test: `←→` picks the count from [`COUNTS`].
+    Count,
     /// Open the words screen, where the pool the test draws from is chosen.
     Words,
     /// Open the code picker, where a language is chosen — or none of them.
@@ -82,27 +84,93 @@ pub enum MenuItem {
     Records,
 }
 
-/// The menu, top to bottom.
+/// What a row does when it is activated — which is also how it is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuKind {
+    /// A choice of one among a few lengths, laid out across the row.
+    Choice,
+    /// On or off.
+    Switch,
+    /// Opens a screen of its own.
+    Screen,
+}
+
+impl MenuItem {
+    pub fn kind(self) -> MenuKind {
+        match self {
+            MenuItem::Time | MenuItem::Count => MenuKind::Choice,
+            MenuItem::Punctuation | MenuItem::Numbers | MenuItem::Practice | MenuItem::Pace => {
+                MenuKind::Switch
+            }
+            MenuItem::Words
+            | MenuItem::Code
+            | MenuItem::Banner
+            | MenuItem::Theme
+            | MenuItem::Records => MenuKind::Screen,
+        }
+    }
+
+    /// The lengths a choice row offers; empty for every other row.
+    pub fn options(self) -> &'static [Length] {
+        match self {
+            MenuItem::Time => &TIMES,
+            MenuItem::Count => &COUNTS,
+            _ => &[],
+        }
+    }
+}
+
+/// The clocks on offer, and the word counts: [`LENGTHS`], split the way the
+/// menu lays them out.
+pub const TIMES: [Length; 3] = [LENGTHS[0], LENGTHS[1], LENGTHS[2]];
+pub const COUNTS: [Length; 3] = [LENGTHS[3], LENGTHS[4], LENGTHS[5]];
+
+/// The menu, in titled groups, top to bottom.
 ///
-/// What the test is comes first — its length, its words, what is done to them
-/// — then how it looks, then how it went.
-pub const MENU: [MenuItem; LENGTHS.len() + 9] = [
-    MenuItem::Length(LENGTHS[0]),
-    MenuItem::Length(LENGTHS[1]),
-    MenuItem::Length(LENGTHS[2]),
-    MenuItem::Length(LENGTHS[3]),
-    MenuItem::Length(LENGTHS[4]),
-    MenuItem::Length(LENGTHS[5]),
+/// What the test is comes first — how long, then what you type — then how it
+/// looks, then how it went. The headings aren't rows: the cursor skips them.
+pub const SECTIONS: [(&str, &[MenuItem]); 4] = [
+    ("test", &[MenuItem::Time, MenuItem::Count]),
+    (
+        "text",
+        &[
+            MenuItem::Words,
+            MenuItem::Code,
+            MenuItem::Punctuation,
+            MenuItem::Numbers,
+            MenuItem::Practice,
+        ],
+    ),
+    (
+        "display",
+        &[MenuItem::Pace, MenuItem::Theme, MenuItem::Banner],
+    ),
+    ("progress", &[MenuItem::Records]),
+];
+
+/// Every selectable row, top to bottom — [`SECTIONS`] without the headings.
+pub const MENU: [MenuItem; 11] = [
+    MenuItem::Time,
+    MenuItem::Count,
     MenuItem::Words,
     MenuItem::Code,
     MenuItem::Punctuation,
     MenuItem::Numbers,
     MenuItem::Practice,
     MenuItem::Pace,
-    MenuItem::Banner,
     MenuItem::Theme,
+    MenuItem::Banner,
     MenuItem::Records,
 ];
+
+/// Row of [`MENU`] a length is chosen on.
+fn length_index(length: Length) -> usize {
+    let row = match length {
+        Length::Time(_) => MenuItem::Time,
+        Length::Words(_) => MenuItem::Count,
+    };
+    MENU.iter().position(|item| *item == row).unwrap_or(0)
+}
 
 /// The code picker, top to bottom: the way out, then every language.
 ///
@@ -365,13 +433,70 @@ impl App {
         self.screen = Screen::Test;
     }
 
-    /// Activate the highlighted row.
+    /// Activate the highlighted row: `enter`.
+    ///
+    /// A length row starts a test of the length it shows — the one in force,
+    /// or its middle option when the test is currently the other kind. A switch
+    /// flips; anything else opens its screen.
     pub fn menu_select(&mut self) {
-        match MENU[self.menu_index] {
-            MenuItem::Length(length) => {
-                self.set_length(length);
+        let item = MENU[self.menu_index];
+
+        match item.kind() {
+            MenuKind::Choice => {
+                let options = item.options();
+                let length = if options.contains(&self.length) {
+                    self.length
+                } else {
+                    options[options.len() / 2]
+                };
+                if length != self.length {
+                    self.set_length(length);
+                }
                 self.screen = Screen::Test;
             }
+            MenuKind::Switch => self.menu_toggle(item),
+            MenuKind::Screen => self.menu_open(item),
+        }
+    }
+
+    /// `←` / `→` on the highlighted row.
+    ///
+    /// Steps a length row through its options, wrapping, and applies each as
+    /// it goes; flips a switch; and `→` opens a screen, like a chevron would.
+    pub fn menu_adjust(&mut self, delta: isize) {
+        let item = MENU[self.menu_index];
+
+        match item.kind() {
+            MenuKind::Choice => {
+                let options = item.options();
+                let len = options.len() as isize;
+                let next = match options.iter().position(|o| *o == self.length) {
+                    Some(at) => (at as isize + delta).rem_euclid(len),
+                    // Coming from the other kind of test: `→` starts at the
+                    // shortest, `←` at the longest.
+                    None if delta > 0 => 0,
+                    None => len - 1,
+                };
+                self.set_length(options[next as usize]);
+            }
+            MenuKind::Switch => self.menu_toggle(item),
+            MenuKind::Screen if delta > 0 => self.menu_open(item),
+            MenuKind::Screen => {}
+        }
+    }
+
+    fn menu_toggle(&mut self, item: MenuItem) {
+        match item {
+            MenuItem::Punctuation => self.toggle_punctuation(),
+            MenuItem::Numbers => self.toggle_numbers(),
+            MenuItem::Practice => self.toggle_practice(),
+            MenuItem::Pace => self.toggle_pace(),
+            _ => {}
+        }
+    }
+
+    fn menu_open(&mut self, item: MenuItem) {
+        match item {
             MenuItem::Words => self.screen = Screen::Words,
             MenuItem::Code => {
                 // Open on the choice in force, not wherever the menu's cursor
@@ -383,21 +508,18 @@ impl App {
                     .unwrap_or(0);
                 self.screen = Screen::Code;
             }
-            MenuItem::Punctuation => self.toggle_punctuation(),
-            MenuItem::Numbers => self.toggle_numbers(),
-            MenuItem::Practice => self.toggle_practice(),
-            MenuItem::Pace => self.toggle_pace(),
             MenuItem::Banner => self.screen = Screen::Banner,
             MenuItem::Theme => self.screen = Screen::Theme,
             MenuItem::Records => self.screen = Screen::Records,
+            _ => {}
         }
     }
 
     /// Whether the setting on this row is in force, for the menu's marker.
     ///
     /// A question per row rather than one highlighted index: the lengths are a
-    /// choice of one, and the modifiers are two independent switches, so there
-    /// is no single row that is "the" active one.
+    /// choice of one, and the modifiers are independent switches, so there is
+    /// no single row that is "the" active one.
     pub fn menu_ticked(&self, item: MenuItem) -> bool {
         // The word settings are ticked by what is *in force*, not by what is
         // stored: in code mode they are remembered but have no say, and a tick
@@ -405,21 +527,34 @@ impl App {
         let modifiers = self.mode().modifiers();
 
         match item {
-            MenuItem::Length(length) => length == self.length,
+            MenuItem::Time | MenuItem::Count => item.options().contains(&self.length),
             MenuItem::Code => self.mode().language().is_some(),
             MenuItem::Punctuation => modifiers.is_some_and(|m| m.punctuation),
             MenuItem::Numbers => modifiers.is_some_and(|m| m.numbers),
             MenuItem::Practice => modifiers.is_some_and(|m| m.practice),
             MenuItem::Pace => self.pace_shown(),
-            MenuItem::Words | MenuItem::Banner | MenuItem::Theme | MenuItem::Records => false,
+            MenuItem::Banner => self.banner_shown(),
+            MenuItem::Words | MenuItem::Theme | MenuItem::Records => false,
+        }
+    }
+
+    /// Whether a row has any say over the test as it stands.
+    ///
+    /// The word modifiers are remembered in code mode but do nothing there, so
+    /// the menu greys them out rather than offering a switch that's
+    /// disconnected.
+    pub fn menu_live(&self, item: MenuItem) -> bool {
+        match item {
+            MenuItem::Punctuation | MenuItem::Numbers | MenuItem::Practice => {
+                self.mode().modifiers().is_some()
+            }
+            _ => true,
         }
     }
 
     /// Row of `MENU` holding the length in force, for the menu's marker.
     pub fn length_index(&self) -> usize {
-        MENU.iter()
-            .position(|item| *item == MenuItem::Length(self.length))
-            .unwrap_or(0)
+        length_index(self.length)
     }
 
     /// Change the test length, and remember it for next time.

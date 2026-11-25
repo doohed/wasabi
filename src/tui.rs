@@ -94,13 +94,15 @@ fn test_key(app: &mut App, key: KeyEvent, ctrl: bool) {
     }
 }
 
-/// Keys in the menu. `j`/`k` alongside the arrows, since the letters are free
+/// Keys in the menu. `hjkl` alongside the arrows, since the letters are free
 /// here and the fingers are already on the home row.
 fn menu_key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => app.back(),
         KeyCode::Up | KeyCode::Char('k') => app.menu_move(-1),
         KeyCode::Down | KeyCode::Char('j') => app.menu_move(1),
+        KeyCode::Left | KeyCode::Char('h') => app.menu_adjust(-1),
+        KeyCode::Right | KeyCode::Char('l') => app.menu_adjust(1),
         KeyCode::Enter | KeyCode::Char(' ') => app.menu_select(),
         _ => {}
     }

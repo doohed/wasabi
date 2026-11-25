@@ -76,6 +76,20 @@ fn toggle(app: &mut App, item: MenuItem) {
     app.menu_select();
 }
 
+/// Choose a length as a user would: open the menu, go to its row, step
+/// across with `→` until it is the one in force, and press `enter`.
+fn pick_length(app: &mut App, length: Length) {
+    app.open_menu();
+    app.menu_index = length_index(length);
+    for _ in 0..LENGTHS.len() {
+        if app.length() == length {
+            break;
+        }
+        app.menu_adjust(1);
+    }
+    app.menu_select();
+}
+
 /// Pretend the run started `seconds` ago, so it has been going long enough to
 /// score.
 fn started(app: &mut App, seconds: u64) {

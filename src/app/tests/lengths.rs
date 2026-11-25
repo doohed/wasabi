@@ -82,7 +82,7 @@ fn a_word_test_is_scored_over_the_time_it_took() {
 #[test]
 fn choosing_a_word_count_deals_exactly_that_many() {
     let mut app = app(&["cat"]);
-    toggle(&mut app, MenuItem::Length(Length::Words(25)));
+    pick_length(&mut app, Length::Words(25));
 
     assert_eq!(app.length(), Length::Words(25));
     assert_eq!(app.words.len(), 25);
@@ -94,7 +94,7 @@ fn choosing_a_word_count_deals_exactly_that_many() {
 fn a_word_count_in_code_mode_deals_that_much_code() {
     let mut app = app(&["cat"]);
     app.set_language(Some(Language::C));
-    toggle(&mut app, MenuItem::Length(Length::Words(50)));
+    pick_length(&mut app, Length::Words(50));
 
     assert_eq!(app.words.len(), 50);
     assert_eq!(app.mode(), Mode::Code(Language::C));
@@ -116,10 +116,7 @@ fn a_stored_word_count_is_used_at_startup() {
 
     assert_eq!(app.length(), Length::Words(100));
     assert_eq!(app.words.len(), 100);
-    assert_eq!(
-        MENU[app.length_index()],
-        MenuItem::Length(Length::Words(100))
-    );
+    assert_eq!(MENU[app.length_index()], MenuItem::Count);
 }
 
 #[test]
@@ -156,6 +153,7 @@ fn a_word_test_and_a_timed_test_keep_separate_records() {
 #[test]
 fn every_length_has_a_menu_row() {
     for length in LENGTHS {
-        assert!(MENU.contains(&MenuItem::Length(length)), "{length:?}");
+        let rows = MENU.iter().filter(|item| item.options().contains(&length));
+        assert_eq!(rows.count(), 1, "{length:?}");
     }
 }

@@ -18,7 +18,7 @@ const CLOCK_WIDTH: u16 = 6;
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let keys = match app.screen {
         Screen::Test => " tab restart · esc menu · ctrl-c quit ",
-        Screen::Menu => " ↑↓ move · enter select · esc back ",
+        Screen::Menu => " ↑↓ move · ←→ change · enter start · esc back ",
         Screen::Words => " e edit · r reload · x remove · esc back ",
         Screen::Code => " ↑↓ move · enter select · esc back ",
         Screen::Banner => " e edit · b on/off · r reload · x remove · esc back ",
